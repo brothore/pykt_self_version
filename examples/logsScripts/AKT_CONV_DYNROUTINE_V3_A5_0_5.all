@@ -1,0 +1,20 @@
+wandb: Creating sweep from: all_wandbs/AKT_CONV_DYNROUTINE_V3_A5_algebra2005_akt_qid_0.yaml
+wandb: Creating sweep with ID: yjitinjy
+wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/AKT_CONV_DYNROUTINE_V3_A5/sweeps/yjitinjy
+wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/AKT_CONV_DYNROUTINE_V3_A5/yjitinjy'
+wandb: Creating sweep from: all_wandbs/AKT_CONV_DYNROUTINE_V3_A5_algebra2005_akt_qid_1.yaml
+wandb: Creating sweep with ID: oc5nkt6n
+wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/AKT_CONV_DYNROUTINE_V3_A5/sweeps/oc5nkt6n
+wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/AKT_CONV_DYNROUTINE_V3_A5/oc5nkt6n'
+wandb: Creating sweep from: all_wandbs/AKT_CONV_DYNROUTINE_V3_A5_algebra2005_akt_qid_2.yaml
+wandb: Creating sweep with ID: isqvgj3y
+wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/AKT_CONV_DYNROUTINE_V3_A5/sweeps/isqvgj3y
+wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/AKT_CONV_DYNROUTINE_V3_A5/isqvgj3y'
+wandb: Creating sweep from: all_wandbs/AKT_CONV_DYNROUTINE_V3_A5_algebra2005_akt_qid_3.yaml
+wandb: Creating sweep with ID: 4l3n5swv
+wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/AKT_CONV_DYNROUTINE_V3_A5/sweeps/4l3n5swv
+wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/AKT_CONV_DYNROUTINE_V3_A5/4l3n5swv'
+wandb: Creating sweep from: all_wandbs/AKT_CONV_DYNROUTINE_V3_A5_algebra2005_akt_qid_4.yaml
+wandb: Creating sweep with ID: m4v2rdu0
+wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/AKT_CONV_DYNROUTINE_V3_A5/sweeps/m4v2rdu0
+wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/AKT_CONV_DYNROUTINE_V3_A5/m4v2rdu0'

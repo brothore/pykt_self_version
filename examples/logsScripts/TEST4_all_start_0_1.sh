@@ -1,0 +1,1 @@
+WANDB_API_KEY=187382bdcaf0520fc4a81a017f34c3e53a40c8a9 wandb sweep all_wandbs/TEST4_assist2009_akt_qid_0.yaml -p TEST4

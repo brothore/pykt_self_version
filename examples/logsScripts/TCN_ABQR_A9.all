@@ -1,0 +1,8 @@
+wandb: Creating sweep from: all_wandbs/TCN_ABQR_A9_assist2009_TCN_ABQR_qid_0.yaml
+wandb: Creating sweep with ID: wvs3p4j5
+wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/TCN_ABQR_A9/sweeps/wvs3p4j5
+wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/TCN_ABQR_A9/wvs3p4j5'
+wandb: Creating sweep from: all_wandbs/TCN_ABQR_A9_assist2009_TCN_ABQR_qid_1.yaml
+wandb: Creating sweep with ID: 8gnxmfck
+wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/TCN_ABQR_A9/sweeps/8gnxmfck
+wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/TCN_ABQR_A9/8gnxmfck'

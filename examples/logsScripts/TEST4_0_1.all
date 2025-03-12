@@ -1,0 +1,4 @@
+wandb: Creating sweep from: all_wandbs/TEST4_assist2009_akt_qid_0.yaml
+wandb: Creating sweep with ID: sptfqy7h
+wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/TEST4/sweeps/sptfqy7h
+wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/TEST4/sptfqy7h'

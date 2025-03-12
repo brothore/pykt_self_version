@@ -1,0 +1,8 @@
+wandb: Creating sweep from: all_wandbs/AKT_CONV_DYNROUTINE_V3_A9_assist2009_akt_qid_3.yaml
+wandb: Creating sweep with ID: das0e6nv
+wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/AKT_CONV_DYNROUTINE_V3_A9/sweeps/das0e6nv
+wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/AKT_CONV_DYNROUTINE_V3_A9/das0e6nv'
+wandb: Creating sweep from: all_wandbs/AKT_CONV_DYNROUTINE_V3_A9_assist2009_akt_qid_4.yaml
+wandb: Creating sweep with ID: w0nmbnh4
+wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/AKT_CONV_DYNROUTINE_V3_A9/sweeps/w0nmbnh4
+wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/AKT_CONV_DYNROUTINE_V3_A9/w0nmbnh4'
