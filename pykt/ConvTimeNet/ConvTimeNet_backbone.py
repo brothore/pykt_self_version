@@ -212,19 +212,27 @@ class ConvEncoderLayer(nn.Module):
 		self.re_param = re_param
 
 		if not re_param: 
-			self.DW_conv = nn.Conv1d(d_model, d_model, kernel_size, 1, 'same', groups=d_model)
+			# self.DW_conv = nn.Conv1d(d_model, d_model, kernel_size, 1, 'same', groups=d_model)
+			self.DW_conv_pad = nn.ConstantPad1d((kernel_size -1, 0), -1)
+			self.DW_conv = nn.Conv1d(d_model, d_model, kernel_size, 1, padding=0, groups=d_model)
+   
 		else:
 			self.large_ks = kernel_size
 			# print(f"kernel_size: {kernel_size}")
 			self.small_ks = small_ks
-			self.DW_conv_large = nn.Conv1d(d_model, d_model, kernel_size, stride=1, padding='same', groups=d_model)
-			self.DW_conv_small = nn.Conv1d(d_model, d_model, small_ks, stride=1, padding='same', groups=d_model)
-			self.DW_infer = nn.Conv1d(d_model, d_model, kernel_size, stride=1, padding='same', groups=d_model)
+			self.DW_conv_large_pad = nn.ConstantPad1d((self.large_ks -1, 0), -1)
+			self.DW_conv_large = nn.Conv1d(d_model, d_model, self.large_ks, stride=1, padding=0, groups=d_model)
+   
+			self.DW_conv_small_pad = nn.ConstantPad1d((self.small_ks -1, 0), -1)
+			self.DW_conv_small = nn.Conv1d(d_model, d_model, self.small_ks, stride=1, padding=0, groups=d_model)
+        
+			self.DW_infer_pad = nn.ConstantPad1d((self.large_ks -1, 0), -1)
+			self.DW_infer = nn.Conv1d(d_model, d_model, self.large_ks, stride=1, padding=0, groups=d_model)
 
-		self.dw_act = get_activation_fn(activation)
+			self.dw_act = get_activation_fn(activation)
 
-		self.sublayerconnect1 = SublayerConnection(enable_res_param, dropout)
-		self.dw_norm = nn.BatchNorm1d(d_model) if norm == 'batch' else nn.LayerNorm(d_model)
+			self.sublayerconnect1 = SublayerConnection(enable_res_param, dropout)
+			self.dw_norm = nn.BatchNorm1d(d_model) if norm == 'batch' else nn.LayerNorm(d_model)
 
 		# Position-wise Feed-Forward
 		self.ff = nn.Sequential(nn.Conv1d(d_model, d_ff, 1, 1), 
@@ -237,29 +245,52 @@ class ConvEncoderLayer(nn.Module):
 		self.norm_ffn = nn.BatchNorm1d(d_model) if norm == 'batch' else nn.LayerNorm(d_model)
 
 
+	# def _get_merged_param(self):
+	# 	left_pad = (self.large_ks - self.small_ks) // 2
+	# 	right_pad = (self.large_ks - self.small_ks) - left_pad
+	# 	module_output = copy.deepcopy(self.DW_conv_large)
+	# 	# module_output.weight += F.pad(self.DW_conv_small.weight, (left_pad, right_pad), value=0)
+	# 	module_output.weight = torch.nn.Parameter(module_output.weight +  F.pad(self.DW_conv_small.weight, (left_pad, right_pad), value=0))
+	# 	# module_output.bias += self.DW_conv_small.bias
+	# 	module_output.bias = torch.nn.Parameter(module_output.bias + self.DW_conv_small.bias)
+	# 	self.DW_infer = module_output
 	def _get_merged_param(self):
-		left_pad = (self.large_ks - self.small_ks) // 2
-		right_pad = (self.large_ks - self.small_ks) - left_pad
-		module_output = copy.deepcopy(self.DW_conv_large)
-		# module_output.weight += F.pad(self.DW_conv_small.weight, (left_pad, right_pad), value=0)
-		module_output.weight = torch.nn.Parameter(module_output.weight +  F.pad(self.DW_conv_small.weight, (left_pad, right_pad), value=0))
-		# module_output.bias += self.DW_conv_small.bias
-		module_output.bias = torch.nn.Parameter(module_output.bias + self.DW_conv_small.bias)
-		self.DW_infer = module_output
+		# 因果卷积的合并逻辑：小卷积核的权重应填充到大卷积核的右侧（因果有效区）
+		left_pad = self.large_ks - self.small_ks  # 所有填充在左侧
+		right_pad = 0  # 右侧不填充
 
+		# 拷贝大卷积核的权重作为基础
+		module_output = copy.deepcopy(self.DW_conv_large)
+
+		# 将小卷积核的权重左侧填充到与大卷积核对齐（确保因果性）
+		padded_small_weight = F.pad(self.DW_conv_small.weight, (left_pad, right_pad), value=0)
+
+		# 合并权重（大核权重 + 填充后的小核权重）
+		module_output.weight = torch.nn.Parameter(module_output.weight + padded_small_weight)
+
+		# 合并偏置项
+		module_output.bias = torch.nn.Parameter(module_output.bias + self.DW_conv_small.bias)
+
+		# 更新推断用的大卷积核
+		self.DW_infer = module_output
 
 	def forward(self, src:torch.Tensor) -> torch.Tensor: # [B, C, L]
 
 		## Deep-wise Conv Layer
 		if not self.re_param:
-			out_x = self.DW_conv(src)
+			x_pad = self.DW_conv_pad(src)
+			out_x = self.DW_conv(x_pad)
 		else:
 			if self.training: # training phase
-				large_out, small_out = self.DW_conv_large(src), self.DW_conv_small(src)
+				large_pad = self.DW_conv_large_pad(src)
+				small_pad = self.DW_conv_small_pad(src)
+    
+				large_out, small_out = self.DW_conv_large(large_pad), self.DW_conv_small(small_pad)
 				out_x = large_out + small_out
 			else: # testing phase
 				self._get_merged_param()
-				out_x = self.DW_infer(src)
+				x_pad = self.DW_infer_pad(src)	
+				out_x = self.DW_infer(x_pad)
 
 		src2 = self.dw_act(out_x)
 		# print(src2.shape); exit(0)
