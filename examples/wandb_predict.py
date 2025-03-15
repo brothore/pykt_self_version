@@ -119,6 +119,8 @@ def main(params):
 
     if params['use_wandb'] == 1:
         wandb.log(dres)
+    print(f"windowauclate_mean: {dres['windowauclate_mean']}")
+    print(f"windowacclate_mean: {dres['windowacclate_mean']}")
     
     # 将评估结果保存到 save_dir 目录下的 evaluation_results.json 文件
     results_path = os.path.join(save_dir, "evaluation_results.json")

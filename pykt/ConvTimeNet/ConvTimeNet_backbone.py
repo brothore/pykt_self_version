@@ -37,10 +37,17 @@ class ConvTimeNet_backbone(nn.Module):
 		# print(f"aaastride: {type(stride)}{stride}")
 		self.padding_patch = padding_patch
 		patch_num = int((context_window - patch_len)/stride + 1)
+		# print(f"patch_num0: {patch_num}")
+  
   		# 分块填充处理
 		if padding_patch == 'end': # can be modified to general case
-			self.padding_patch_layer = nn.ReplicationPad1d((0, stride)) 
+			self.padding_patch_layer = nn.ReplicationPad1d((0, stride*2)) 
 			patch_num += 1
+			# print(f"patch num afte pad{patch_num}")
+   
+   
+
+		# print(f"patch_num1: {patch_num}")
 		
 		seq_len = (patch_num - 1) * self.stride + self.patch_len
   		# 3. 可变形采样模块
@@ -67,30 +74,44 @@ class ConvTimeNet_backbone(nn.Module):
 		# norm  归一化处理
 		if self.revin: 
 			z = z.permute(0,2,1)
+			# print(f"[Revin Norm] After permute: {z.shape}")
 			z = self.revin_layer(z, 'norm')
+			# print(f"[Revin Norm] After norm: {z.shape}")
 			z = z.permute(0,2,1)
 			
-		# do patching 分块处理
+		# do patching 分块处理 [Batch, Num_Vars, Context_Window] -> [Batch, Num_Vars, Context_Window + Stride]
+		# print(f"before pad z.shape: {z.shape}")
 		if self.padding_patch == 'end':
 			z = self.padding_patch_layer(z)
+			# print(f"[Padding] After padding: {z.shape}")
 
-		if not self.deformable:
+		if not self.deformable: #[Batch, Num_Vars, Context_Window + Stride] -> [Batch, Num_Vars, Num_Patches, Patch_Len]
 			z = z.unfold(dimension=-1, size=self.patch_len, step=self.stride)    
-		else:
+			# print(f"[Unfold] After unfold: {z.shape}")
+		else: #[Batch, Num_Vars, Context_Window + Stride] -> [Batch, Num_Vars, Num_Patches, Patch_Len]
 			# print(f"z: {z.shape}")
 			z = self.deformable_sampling(z)
-			
+			# print(f"[Deformable Sampling] After sampling: {z.shape}")
+   
+   
+   
 		z = z.permute(0,1,3,2) # z: [bs x nvars x patch_len x patch_num]
-		
+		# print(f"[Permute] After permute: {z.shape}")
 		# model 编码处理 &输出预测
 		z = self.backbone(z)                 # z: [bs x nvars x d_model x patch_num]
+		# print(f"[Backbone] Output shape: {z.shape}")
+
 		z = self.head(z)                     # z: [bs x nvars x target_window] 
+		# print(f"[Head] Output shape: {z.shape}")
 		
 		# denorm 反归一化
 		if self.revin: 
 			z = z.permute(0,2,1)
+			# print(f"[Revin Denorm] After permute: {z.shape}")
 			z = self.revin_layer(z, 'denorm')
+			# print(f"[Revin Denorm] After denorm: {z.shape}")
 			z = z.permute(0,2,1)
+			# print(f"[Revin Denorm] Final output shape: {z.shape}")
 		return z
 # 展平输出头部
 class Flatten_Head(nn.Module):

@@ -50,7 +50,7 @@ def main(params):
         if model_name in ["dtransformer"]:
             train_config["batch_size"] = 32 ## because of OOM
         model_config = copy.deepcopy(params)
-        for key in ["model_name", "dataset_name", "emb_type", "save_dir", "fold", "seed"]:
+        for key in ["model_name", "dataset_name", "emb_type", "save_dir", "fold", "seed","predict_after_train"]:
             del model_config[key]
         if 'batch_size' in params:
             train_config["batch_size"] = params['batch_size']
@@ -167,3 +167,17 @@ def main(params):
     if params['use_wandb']==1:
         wandb.log({ 
                     "validauc": validauc, "validacc": validacc, "best_epoch": best_epoch,"model_save_path":model_save_path})
+
+    if params['predict_after_train'] == 1:
+        # 导入目标脚本的main函数
+        from wandb_predict import main as predict_main
+        
+        # 构造参数字典（可根据需要从params中获取或使用固定值）
+        predict_params = {
+            'save_dir': ckpt_path,  # 模型保存目录
+            'bz': 256,  # 模型保存目录
+            'use_wandb': 0  # 是否使用wandb
+        }
+        
+        # 调用目标脚本的main函数并传入参数
+        predict_main(predict_params)

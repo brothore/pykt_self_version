@@ -25,9 +25,9 @@ if __name__ == "__main__":
     parser.add_argument('--target', type=str, default='OT', help='target feature in S or MS task')
     parser.add_argument('--freq', type=str, default='h',
                     help='freq for time features encoding, options:[s:secondly, t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly], you can also use more detailed freq like 15min or 3h')
-    parser.add_argument('--seq_len', type=int, default=96, help='input sequence length')
+    parser.add_argument('--seq_len', type=int, default=215, help='input sequence length')
     parser.add_argument('--label_len', type=int, default=48, help='start token length')
-    parser.add_argument('--pred_len', type=int, default=96, help='prediction sequence length')
+    parser.add_argument('--pred_len', type=int, default=199, help='prediction sequence length')
     # ConvTimeNet
     parser.add_argument('--head_dropout', type=float, default=0.0, help='head dropout')
     parser.add_argument('--padding_patch', default='end', help='None: None; end: padding on the end')
@@ -41,14 +41,14 @@ if __name__ == "__main__":
     parser.add_argument('--re_param_kernel', type=int, default=3)
 
     # Patch
-    parser.add_argument('--patch_ks', type=int, default=32, help="kernel size of the patch window. default:32")
+    parser.add_argument('--patch_ks', type=int, default=32, help="kernel size of the patch window. default:32") #patch_len = configs["patch_ks"]  #patch_count
     parser.add_argument('--patch_sd', type=float, default=0.5, \
                         help="stride of the patch window. default: 0.5. if < 1, then sd = patch_sd * patch_ks")
 
 
     # Other Parameter
-    parser.add_argument('--enc_in', type=int, default=7, help='encoder input size') 
-    parser.add_argument('--c_out', type=int, default=7, help='output size')
+    parser.add_argument('--enc_in', type=int, default=123, help='encoder input size') 
+    parser.add_argument('--c_out', type=int, default=123, help='output size')
     parser.add_argument('--d_model', type=int, default=64, help='dimension of model')
     parser.add_argument('--e_layers', type=int, default=6, help='num of encoder layers')
     parser.add_argument('--d_ff', type=int, default=256, help='dimension of fcn')
@@ -63,7 +63,9 @@ if __name__ == "__main__":
     parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
     parser.add_argument('--itr', type=int, default=2, help='experiments times')
     parser.add_argument('--train_epochs', type=int, default=10, help='train epochs')
-    parser.add_argument('--batch_size', type=int, default=128, help='batch size of train input data')
+    parser.add_argument('--batch_size', type=int, default=
+                        
+                        8, help='batch size of train input data')
     parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
     parser.add_argument('--learning_rate', type=float, default=0.0001, help='optimizer learning rate')
     parser.add_argument('--des', type=str, default='test', help='exp description')
@@ -83,6 +85,8 @@ if __name__ == "__main__":
     parser.add_argument("--use_wandb", type=int, default=0)
     parser.add_argument("--add_uuid", type=int, default=1)
     parser.add_argument("--name", type=str, default="use_caps")
+    parser.add_argument("--predict_after_train", type=int, default="0")
+    
     
     args = parser.parse_args()
 

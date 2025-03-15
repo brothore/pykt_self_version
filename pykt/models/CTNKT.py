@@ -36,10 +36,13 @@ class CTNKT(nn.Module):
     def __init__(self,num_c, configs,emb_type, norm:str='batch', act:str="gelu", head_type = 'flatten'):
         
         super().__init__()
+        self.num_c = num_c
         self.model_name = "CTNKT"
-        print(f"configs{configs}")
+        
+        # print(f"configs{configs}")
         # load parameters 参数初始化
         c_in = configs["enc_in"]
+        # c_in = configs["emb_size"]
         context_window = configs["seq_len"]
         target_window = configs["pred_len"]
         self.emb_size = configs["emb_size"]
@@ -54,6 +57,7 @@ class CTNKT(nn.Module):
         # print(f"patch_len{patch_len}")
         patch_sd = max(1, int(configs["patch_ks"] * configs["patch_sd"])) if configs["patch_sd"] <= 1 else int(configs["patch_sd"])
         stride = patch_sd
+        print(f"stridesd: {stride}")
         padding_patch = configs["padding_patch"]
         # 归一化相关参数
         revin = configs["revin"]
@@ -67,9 +71,9 @@ class CTNKT(nn.Module):
         re_param = configs["re_param"]
         re_param_kernel = configs["re_param_kernel"]
         enable_res_param = configs["enable_res_param"]
-        self.num_c = num_c
-        if emb_type.startswith("qid"):
-            self.interaction_emb = Embedding(self.num_c * 2, self.emb_size)
+        self.interaction_emb = nn.Embedding(self.num_c * 2,self.num_c)
+        # self.interaction_emb = nn.Embedding(self.num_c * 2,self.emb_size)
+
         
         # model 模型主干
         self.model = ConvTimeNet_backbone(c_in=c_in, seq_len=seq_len, context_window = context_window,
@@ -79,10 +83,19 @@ class CTNKT(nn.Module):
     def forward(self, q,r):
         if self.emb_type == "qid":
             x = q + self.num_c * r
-            xemb = self.interaction_emb(x)
-        print(f"xemb shape: {xemb.shape}")
-        x = xemb.permute(0,2,1)    # 维度转换 [B, L, C] -> [B, C, L]
+            # print(f"x.shape: {x.shape}")
+            x = self.interaction_emb(x)
+        # print(f"xemb shape: {x.shape}")
+        # x = x.unsqueeze(-1)
+        # print(f"after xemb shape: {x.shape}")
+        
+        x = x.permute(0,2,1)    # 维度转换 [B, L, C] -> [B, C, L]
+        # print(f"x.shape: {x.shape}")
         x = self.model(x)
         x = x.permute(0,2,1)  # 维度还原  [B, C, L] -> [B, L, C]
-        print(f"x{x.shape}")
+        # print(f"x: {x.shape}")
+        x = x.squeeze(dim=-1)  
+        x = torch.sigmoid(x)
+        # print(f"x.shape{x.shape}")
+        # print(f"x{x}")
         return x

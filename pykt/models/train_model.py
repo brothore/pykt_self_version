@@ -96,8 +96,8 @@ def cal_loss(model, ys, r, rshft, sm, preloss=[]):
     return loss
 
 
-def model_forward(model, data, opt, rel=None,model_config={}):
-    print(f"model_config5: {model_config}")
+def model_forward(model, data, opt=None, rel=None,model_config={}):
+    # print(f"model_config5: {model_config}")
     print("model forward")
     model_name = model.model_name
     # if model_name in ["dkt_forget", "lpkt"]:
@@ -320,7 +320,7 @@ def model_forward(model, data, opt, rel=None,model_config={}):
 def train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, test_loader=None, test_window_loader=None, save_model=False, data_config=None, fold=None,emb_sizess=128,model_config={}):
     max_auc, best_epoch = 0, -1
     train_step = 0
-    print(f"model_config3: {model_config}")
+    # print(f"model_config3: {model_config}")
     rel = None
     if model.model_name == "rkt":
         dpath = data_config["dpath"]
