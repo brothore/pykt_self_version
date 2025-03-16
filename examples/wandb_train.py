@@ -11,7 +11,7 @@ from pykt.models import train_model,evaluate,init_model
 from pykt.utils import debug_print,set_seed
 from pykt.datasets import init_dataset4train
 import datetime
-
+XIE_LOU_TEST = 0
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 device = "cpu" if not torch.cuda.is_available() else "cuda"
 os.environ['CUBLAS_WORKSPACE_CONFIG']=':4096:2'
@@ -151,9 +151,12 @@ def main(params):
         testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch = train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, None, None, save_model,emb_sizess=emb_size,model_config=model_config)
 
     else:
-        # print(f"aaa emb{emb_size}")
-        testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch = train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, None, None, save_model,emb_sizess=emb_size)
-    
+        if XIE_LOU_TEST :
+            pass
+        else:
+            # print(f"aaa emb{emb_size}")
+            testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch = train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, None, None, save_model,emb_sizess=emb_size)
+
     if save_model:
         best_model = init_model(model_name, model_config, data_config[dataset_name], emb_type)
         net = torch.load(os.path.join(ckpt_path, emb_type+"_model.ckpt"))

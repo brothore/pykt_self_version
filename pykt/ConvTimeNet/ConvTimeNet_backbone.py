@@ -41,7 +41,8 @@ class ConvTimeNet_backbone(nn.Module):
   
   		# 分块填充处理
 		if padding_patch == 'end': # can be modified to general case
-			self.padding_patch_layer = nn.ReplicationPad1d((0, stride*2)) 
+			# self.padding_patch_layer = nn.ReplicationPad1d((0, stride*2)) 
+			self.padding_patch_layer = nn.ReplicationPad1d(( stride,0)) 
 			patch_num += 1
 			# print(f"patch num afte pad{patch_num}")
    
@@ -254,24 +255,29 @@ class ConvEncoderLayer(nn.Module):
 	# 	# module_output.bias += self.DW_conv_small.bias
 	# 	module_output.bias = torch.nn.Parameter(module_output.bias + self.DW_conv_small.bias)
 	# 	self.DW_infer = module_output
+ 
 	def _get_merged_param(self):
-		# 因果卷积的合并逻辑：小卷积核的权重应填充到大卷积核的右侧（因果有效区）
-		left_pad = self.large_ks - self.small_ks  # 所有填充在左侧
-		right_pad = 0  # 右侧不填充
+		# 因果合并：将小核权重填充到大核的右侧（仅左侧填充）
+		left_pad = self.large_ks - self.small_ks
+		right_pad = 0
 
-		# 拷贝大卷积核的权重作为基础
+		# 拷贝大卷积核参数
 		module_output = copy.deepcopy(self.DW_conv_large)
-
-		# 将小卷积核的权重左侧填充到与大卷积核对齐（确保因果性）
-		padded_small_weight = F.pad(self.DW_conv_small.weight, (left_pad, right_pad), value=0)
-
-		# 合并权重（大核权重 + 填充后的小核权重）
-		module_output.weight = torch.nn.Parameter(module_output.weight + padded_small_weight)
-
-		# 合并偏置项
-		module_output.bias = torch.nn.Parameter(module_output.bias + self.DW_conv_small.bias)
-
-		# 更新推断用的大卷积核
+		
+		# 对小的卷积核权重进行左侧填充，使其与大核右对齐
+		padded_small_weight = F.pad(self.DW_conv_small.weight, 
+								(left_pad, right_pad), 
+								value=0)
+		
+		# 合并参数（大核 + 填充后的小核）
+		module_output.weight = torch.nn.Parameter(
+			module_output.weight + padded_small_weight
+		)
+		module_output.bias = torch.nn.Parameter(
+			module_output.bias + self.DW_conv_small.bias
+		)
+		
+		# 更新推理用的卷积层
 		self.DW_infer = module_output
 
 	def forward(self, src:torch.Tensor) -> torch.Tensor: # [B, C, L]

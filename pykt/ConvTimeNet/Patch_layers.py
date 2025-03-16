@@ -57,6 +57,8 @@ class BoxCoder(nn.Module):
 		#将锚点 boxes 从 (P,) 调整为 (1, P, 1)。 1 6 1
 		ref_x = boxes.view(1, boxes.shape[0], 1)
 		# print(f"ref_x.shape: {ref_x.shape}")
+		# print(f"dx.shape: {dx.shape}")
+
 		# dx, ds: (bs, patch_count, channel, 1)
 		# ref_x 的维度 (1, P, 1) 会被广播为 (B, P, C)。
 		# dx 和 ds 的维度均为 (B, P, C)
@@ -70,6 +72,9 @@ class BoxCoder(nn.Module):
 		pred_boxes = pred_boxes.clamp_(min=0., max=1.)
 
 		# pred_boxes: each of the patch's left-bound & right-bound. norm to [0, 1] (B, P, C, 2)
+		# max_right = (self.seq_len - 1)  # 最大允许的右边界索引
+		# pred_boxes[:, :, :, 0] = torch.clamp(pred_boxes[:, :, :, 0] * (self.seq_len - 1), min=0, max=max_right) / (self.seq_len - 1)
+		# pred_boxes[:, :, :, 1] = torch.clamp(pred_boxes[:, :, :, 1] * (self.seq_len - 1), min=0, max=max_right) / (self.seq_len - 1)
 		return pred_boxes	
    
 	def meshgrid(self, boxes): # Input: pred_boxes. To get the sampling location

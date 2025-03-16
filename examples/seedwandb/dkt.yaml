@@ -24,3 +24,5 @@ parameters:
         values: [0, 1, 2, 3, 4]
     predict_after_train:
         values: [0]
+    use_wandb:
+        values: [1]
