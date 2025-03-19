@@ -1,0 +1,7 @@
+#!/bin/bash
+
+CUDA_VISIBLE_DEVICES=5 nohup python wandb_predict.py --use_wandb 0 --save_dir "models/dkt_DKT_LIQUID_A9_tiaocan_assist2009/assist2009_dkt_qid_models/dkt_DKT_LIQUID_A9_tiaocan_assist2009_3407_0_0.3_256_0.0001_1_1_0_75f782b9-3882-4484-bd9a-284b5f72042d/" > results/DKT_LIQUID_A9/fold0_predict.log 2>&1 &
+CUDA_VISIBLE_DEVICES=5 nohup python wandb_predict.py --use_wandb 0 --save_dir "models/dkt_DKT_LIQUID_A9_tiaocan_assist2009/assist2009_dkt_qid_models/dkt_DKT_LIQUID_A9_tiaocan_assist2009_42_1_0.1_256_0.0001_1_1_0_fa667824-dddf-4fa2-a0ae-eae8fdf161e9/" > results/DKT_LIQUID_A9/fold1_predict.log 2>&1 &
+CUDA_VISIBLE_DEVICES=6 nohup python wandb_predict.py --use_wandb 0 --save_dir "models/dkt_DKT_LIQUID_A9_tiaocan_assist2009/assist2009_dkt_qid_models/dkt_DKT_LIQUID_A9_tiaocan_assist2009_3407_2_0.5_256_0.0001_1_1_0_9fa7e7ba-cfe4-4914-9b0b-b1a9bab73fd9/" > results/DKT_LIQUID_A9/fold2_predict.log 2>&1 &
+CUDA_VISIBLE_DEVICES=6 nohup python wandb_predict.py --use_wandb 0 --save_dir "models/dkt_DKT_LIQUID_A9_tiaocan_assist2009/assist2009_dkt_qid_models/dkt_DKT_LIQUID_A9_tiaocan_assist2009_42_3_0.05_256_0.0001_1_1_0_a4410058-0f4f-4599-99bf-f45a15ff1049/" > results/DKT_LIQUID_A9/fold3_predict.log 2>&1 &
+CUDA_VISIBLE_DEVICES=7 nohup python wandb_predict.py --use_wandb 0 --save_dir "models/dkt_DKT_LIQUID_A9_tiaocan_assist2009/assist2009_dkt_qid_models/dkt_DKT_LIQUID_A9_tiaocan_assist2009_42_4_0.5_256_0.0001_1_1_0_c9993a3e-6f43-4d03-8551-fc45fb00de2b/" > results/DKT_LIQUID_A9/fold4_predict.log 2>&1 &

@@ -1,20 +1,20 @@
-wandb: Creating sweep from: all_wandbs/DKT_LIQUID_A9_assist2009_dkt_qid_0.yaml
-wandb: Creating sweep with ID: dq512plk
-wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/DKT_LIQUID_A9/sweeps/dq512plk
-wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/DKT_LIQUID_A9/dq512plk'
-wandb: Creating sweep from: all_wandbs/DKT_LIQUID_A9_assist2009_dkt_qid_1.yaml
-wandb: Creating sweep with ID: x6fln5i1
-wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/DKT_LIQUID_A9/sweeps/x6fln5i1
-wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/DKT_LIQUID_A9/x6fln5i1'
-wandb: Creating sweep from: all_wandbs/DKT_LIQUID_A9_assist2009_dkt_qid_2.yaml
-wandb: Creating sweep with ID: r4ulj0wd
-wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/DKT_LIQUID_A9/sweeps/r4ulj0wd
-wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/DKT_LIQUID_A9/r4ulj0wd'
-wandb: Creating sweep from: all_wandbs/DKT_LIQUID_A9_assist2009_dkt_qid_3.yaml
-wandb: Creating sweep with ID: zor1gytf
-wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/DKT_LIQUID_A9/sweeps/zor1gytf
-wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/DKT_LIQUID_A9/zor1gytf'
-wandb: Creating sweep from: all_wandbs/DKT_LIQUID_A9_assist2009_dkt_qid_4.yaml
-wandb: Creating sweep with ID: 2hwv5uxq
-wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/DKT_LIQUID_A9/sweeps/2hwv5uxq
-wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/DKT_LIQUID_A9/2hwv5uxq'
+wandb: Creating sweep from: all_wandbs/DKT_LIQUID_A9_bridge2algebra2006_dkt_qid_0.yaml
+wandb: Creating sweep with ID: 73et8y5v
+wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/DKT_LIQUID_A9/sweeps/73et8y5v
+wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/DKT_LIQUID_A9/73et8y5v'
+wandb: Creating sweep from: all_wandbs/DKT_LIQUID_A9_bridge2algebra2006_dkt_qid_1.yaml
+wandb: Creating sweep with ID: 771qip4c
+wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/DKT_LIQUID_A9/sweeps/771qip4c
+wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/DKT_LIQUID_A9/771qip4c'
+wandb: Creating sweep from: all_wandbs/DKT_LIQUID_A9_bridge2algebra2006_dkt_qid_2.yaml
+wandb: Creating sweep with ID: qnhd6qae
+wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/DKT_LIQUID_A9/sweeps/qnhd6qae
+wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/DKT_LIQUID_A9/qnhd6qae'
+wandb: Creating sweep from: all_wandbs/DKT_LIQUID_A9_bridge2algebra2006_dkt_qid_3.yaml
+wandb: Creating sweep with ID: riza0610
+wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/DKT_LIQUID_A9/sweeps/riza0610
+wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/DKT_LIQUID_A9/riza0610'
+wandb: Creating sweep from: all_wandbs/DKT_LIQUID_A9_bridge2algebra2006_dkt_qid_4.yaml
+wandb: Creating sweep with ID: jqj9jjzl
+wandb: View sweep at: https://wandb.ai/byoung9527-Jinan%20University/DKT_LIQUID_A9/sweeps/jqj9jjzl
+wandb: Run sweep agent with: wandb agent 'byoung9527-Jinan University/DKT_LIQUID_A9/jqj9jjzl'

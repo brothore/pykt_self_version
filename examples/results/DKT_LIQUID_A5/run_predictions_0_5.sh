@@ -1,0 +1,7 @@
+#!/bin/bash
+
+CUDA_VISIBLE_DEVICES=5 nohup python wandb_predict.py --use_wandb 0 --save_dir "models/dkt_DKT_LIQUID_A5_tiaocan_algebra2005/algebra2005_dkt_qid_models/dkt_DKT_LIQUID_A5_tiaocan_algebra2005_3407_0_0.1_256_0.0001_1_1_0_95212991-b40d-4bd5-8c12-fef2d0aab0ac/" > results/DKT_LIQUID_A5/fold0_predict.log 2>&1 &
+CUDA_VISIBLE_DEVICES=5 nohup python wandb_predict.py --use_wandb 0 --save_dir "models/dkt_DKT_LIQUID_A5_tiaocan_algebra2005/algebra2005_dkt_qid_models/dkt_DKT_LIQUID_A5_tiaocan_algebra2005_3407_1_0.5_256_0.001_1_1_0_afb568d7-114b-45f5-a1ec-fb54233ecb8c/" > results/DKT_LIQUID_A5/fold1_predict.log 2>&1 &
+CUDA_VISIBLE_DEVICES=6 nohup python wandb_predict.py --use_wandb 0 --save_dir "models/dkt_DKT_LIQUID_A5_tiaocan_algebra2005/algebra2005_dkt_qid_models/dkt_DKT_LIQUID_A5_tiaocan_algebra2005_42_2_0.05_256_0.0001_1_1_0_33ef67b8-b885-40ea-9e0a-df4e14e64bcd/" > results/DKT_LIQUID_A5/fold2_predict.log 2>&1 &
+CUDA_VISIBLE_DEVICES=6 nohup python wandb_predict.py --use_wandb 0 --save_dir "models/dkt_DKT_LIQUID_A5_tiaocan_algebra2005/algebra2005_dkt_qid_models/dkt_DKT_LIQUID_A5_tiaocan_algebra2005_3407_3_0.05_256_0.0001_1_1_0_80318bce-96a7-4812-a0d5-19767d466321/" > results/DKT_LIQUID_A5/fold3_predict.log 2>&1 &
+CUDA_VISIBLE_DEVICES=7 nohup python wandb_predict.py --use_wandb 0 --save_dir "models/dkt_DKT_LIQUID_A5_tiaocan_algebra2005/algebra2005_dkt_qid_models/dkt_DKT_LIQUID_A5_tiaocan_algebra2005_3407_4_0.1_256_0.0001_1_1_0_c0946a90-ebe7-402d-a3fe-2793b20529ed/" > results/DKT_LIQUID_A5/fold4_predict.log 2>&1 &

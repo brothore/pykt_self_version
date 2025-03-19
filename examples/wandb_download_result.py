@@ -5,7 +5,7 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 import json
 import argparse
-
+import subprocess
 def main():
     # 解析命令行参数
     parser = argparse.ArgumentParser(description='Fetch Wandb runs and generate prediction scripts.')
@@ -190,8 +190,27 @@ def main():
             try:
                 os.chmod(prediction_script_path, 0o755)
                 print(f"已赋予 '{prediction_script_path}' 执行权限。")
+                
+                # 新增：运行脚本
+        
             except Exception as e:
-                print(f"无法赋予执行权限给 '{prediction_script_path}'，错误: {e}")
+                print(f"操作失败，错误: {e}")
+                
+        try:
+            # 使用 subprocess.run 替代 os.system
+            subprocess.run(
+                ["bash", prediction_script_path],
+                check=True,  # 检查命令执行状态
+                shell=False,  # 避免潜在的安全风险
+                env=dict(os.environ, MKL_THREADING_LAYER="GNU")  # 添加环境变量解决 MKL 兼容问题
+            )
+            print(f"✅ 脚本 '{prediction_script_path}' 执行成功")
+        except subprocess.CalledProcessError as e:
+            print(f"❌ 脚本执行失败，错误码：{e.returncode}")
+            print(f"详细错误：{e.stderr}")  # 如果需捕获错误输出，可添加 stderr=subprocess.PIPE 参数
+        except Exception as e:
+            print(f"❌ 发生未知错误：{str(e)}")
+        print(f"已启动脚本 '{prediction_script_path}'")
 
 if __name__ == "__main__":
     main()

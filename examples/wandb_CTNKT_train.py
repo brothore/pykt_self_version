@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     # Patch
     parser.add_argument('--patch_ks', type=int, default=32, help="kernel size of the patch window. default:32") #patch_len = configs["patch_ks"]  #patch_count
-    parser.add_argument('--patch_sd', type=float, default=0.5, \
+    parser.add_argument('--patch_sd', type=float, default=1, \
                         help="stride of the patch window. default: 0.5. if < 1, then sd = patch_sd * patch_ks")
 
 
