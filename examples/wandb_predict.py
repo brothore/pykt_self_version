@@ -11,12 +11,13 @@ from pykt.datasets import init_test_datasets
 device = "cpu" if not torch.cuda.is_available() else "cuda"
 os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:2'
 
-with open("../configs/wandb.json") as fin:
-    wandb_config = json.load(fin)
+
 
 def main(params):
     if params['use_wandb'] == 1:
         import wandb
+        with open("../configs/wandb.json") as fin:
+            wandb_config = json.load(fin)
         os.environ['WANDB_API_KEY'] = wandb_config["api_key"]
         wandb.init(project="wandb_predict")
 
@@ -136,7 +137,7 @@ if __name__ == "__main__":
     parser.add_argument("--bz", type=int, default=256)
     parser.add_argument("--save_dir", type=str, default="saved_model")
     parser.add_argument("--fusion_type", type=str, default="early_fusion,late_fusion")
-    parser.add_argument("--use_wandb", type=int, default=1)
+    parser.add_argument("--use_wandb", type=int, default=0)
 
     args = parser.parse_args()
     print(args)

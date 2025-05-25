@@ -8,11 +8,13 @@ from ..datasets.lpkt_utils import generate_time2idx
 import pandas as pd
 import csv
 USE_EARLY = 0
+TCN_ABQR = 0
 device = "cpu" if not torch.cuda.is_available() else "cuda"
-pre_load_gcn = "/share/disk/hzb/dataset/assistment2009/ques_skill_gcn_adj.pt"
-matrix = torch.load(pre_load_gcn).to(device)
-if not matrix.is_sparse:
-    matrix = matrix.to_sparse()
+if TCN_ABQR:
+    pre_load_gcn = "/share/disk/hzb/dataset/assistment2009/ques_skill_gcn_adj.pt"
+    matrix = torch.load(pre_load_gcn).to(device)
+    if not matrix.is_sparse:
+        matrix = matrix.to_sparse()
 def save_cur_predict_result(dres, q, r, d, t, m, sm, p):
     # dres, q, r, qshft, rshft, m, sm, y
     results = []

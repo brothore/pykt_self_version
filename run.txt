@@ -1,0 +1,39 @@
+export PROJECT_NAME="DKT_LIQUID_A9"
+export DATASET_NAME="assist2009"
+export MODEL_NAME="dkt"
+export WANDB_API_KEY=187382bdcaf0520fc4a81a017f34c3e53a40c8a9
+export NUMS="0,3,5,6,7"
+export START_SWEEP=0
+export END_SWEEP=5
+
+#创建各个sweep的训练参数yaml
+ce && python generate_wandb.py --dataset_names "$DATASET_NAME" --project_name "$PROJECT_NAME" --model_names "$MODEL_NAME" --start_sweep "$START_SWEEP" --end_sweep "$END_SWEEP" --new 1
+#提交sweep到wandb
+sh ./logsScripts/${PROJECT_NAME}_all_start_${START_SWEEP}_${END_SWEEP}.sh > ./logsScripts/${PROJECT_NAME}.all 2>&1
+
+#创建运行脚本
+sh run_all.sh ./logsScripts/${PROJECT_NAME}.all "$START_SWEEP" "$END_SWEEP" "$DATASET_NAME" "$MODEL_NAME" "$NUMS" "$PROJECT_NAME"
+
+#运行运行脚本
+sh ./logsScripts/${PROJECT_NAME}_${START_SWEEP}_${END_SWEEP}.sh >> ./logsScripts/${PROJECT_NAME}_${START_SWEEP}_${END_SWEEP}.log &
+
+#下载模型路径#进行fusion
+python wandb_download_result.py --new 0
+
+#保存csv
+python wandb_fusion2csv.py --project_name "$PROJECT_NAME"  --start_sweep "$START_SWEEP" --end_sweep "$END_SWEEP"  --interval 10 --timeout 3000
+
+
+
+
+
+#恢复所有sweep
+./logsScripts/resumeSweep_${PROJECT_NAME}_${START_SWEEP}_${END_SWEEP}.sh
+
+#停止所有sweep
+./logsScripts/stopSweep_${PROJECT_NAME}_${START_SWEEP}_${END_SWEEP}.sh
+
+#杀死所有sweep
+./logsScripts/killSweep_${PROJECT_NAME}_${START_SWEEP}_${END_SWEEP}.sh
+
+

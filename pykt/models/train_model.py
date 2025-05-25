@@ -16,11 +16,12 @@ import traceback
 from pykt.models.TCN_ABQR import BGRL
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-pre_load_gcn = "/share/disk/hzb/dataset/assistment2009/ques_skill_gcn_adj.pt"
-matrix = torch.load(pre_load_gcn).to(device)
-if not matrix.is_sparse:
-    matrix = matrix.to_sparse()
+TCN_ABQR = 0
+if TCN_ABQR:
+    pre_load_gcn = "/share/disk/hzb/dataset/assistment2009/ques_skill_gcn_adj.pt"
+    matrix = torch.load(pre_load_gcn).to(device)
+    if not matrix.is_sparse:
+        matrix = matrix.to_sparse()
 def save_results_to_file(results, folder_path, file_name="results.txt"):
     """保存结果到文件中"""
     # 确保文件夹存在
