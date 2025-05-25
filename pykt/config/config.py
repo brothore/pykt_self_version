@@ -5,3 +5,5 @@ qikt_ab_models = ["qikt_ab_a+b+c","qikt_ab_a+b+c+irt","qikt_ab_a+b+irt","qikt_ab
 que_type_models += qikt_ab_models
 
 PRINT_DATA_PROCESS = 1
+
+SET_TARGET_STU = 0
