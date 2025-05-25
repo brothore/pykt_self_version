@@ -108,8 +108,14 @@ def init_test_datasets(data_config, model_name, batch_size, diff_level=None, arg
         test_window_dataset = KTDataset(os.path.join(data_config["dpath"], data_config["test_window_file"]), data_config["input_type"], {-1})
         if "test_question_file" in data_config:
             test_question_dataset = KTDataset(os.path.join(data_config["dpath"], data_config["test_question_file"]), data_config["input_type"], {-1}, True)
-            test_question_window_dataset = KTDataset(os.path.join(data_config["dpath"], data_config["test_question_window_file"]), data_config["input_type"], {-1}, True)
-
+            if SET_TARGET_STU == 0:
+                test_question_window_dataset = KTDataset(os.path.join(data_config["dpath"], data_config["test_question_window_file"]), data_config["input_type"], {-1}, True)
+            elif SET_TARGET_STU == 1:
+                test_question_window_dataset = KTDataset(os.path.join(data_config["dpath"], data_config["pk_test_question_window_file"]), data_config["input_type"], {-1}, True)
+            elif SET_TARGET_STU == 2:
+                test_question_window_dataset = KTDataset(os.path.join(data_config["dpath"], data_config["ph_test_question_window_file"]), data_config["input_type"], {-1}, True)
+            elif SET_TARGET_STU == 3:
+                test_question_window_dataset = KTDataset(os.path.join(data_config["dpath"], data_config["pt_test_question_window_file"]), data_config["input_type"], {-1}, True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     test_window_loader = DataLoader(test_window_dataset, batch_size=batch_size, shuffle=False)
     if "test_question_file" in data_config:

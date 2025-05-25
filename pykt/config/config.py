@@ -6,4 +6,7 @@ que_type_models += qikt_ab_models
 
 PRINT_DATA_PROCESS = 1
 
-SET_TARGET_STU = 0
+SET_TARGET_STU = 1
+#pk ph pt 1 2 3
+
+
