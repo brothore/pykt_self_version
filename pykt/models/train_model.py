@@ -9,13 +9,14 @@ from torch.autograd import Variable, grad
 from .atkt import _l2_normalize_adv
 from ..utils.utils import debug_print
 from pykt.config import que_type_models
+from pykt.config import FOCAL_LOSS
 import pandas as pd
 import time  # 导入时间模块
 import pykt.models.glo
 import traceback
 from pykt.models.TCN_ABQR import BGRL
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+ii = 0
 TCN_ABQR = 0
 if TCN_ABQR:
     pre_load_gcn = "/share/disk/hzb/dataset/assistment2009/ques_skill_gcn_adj.pt"
@@ -34,14 +35,53 @@ def save_results_to_file(results, folder_path, file_name="results.txt"):
     print(f"结果已保存到文件: {file_path}")
 
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 def cal_loss(model, ys, r, rshft, sm, preloss=[]):
     model_name = model.model_name
+    
+    # 定义 Focal Loss 函数
+    def focal_loss(y_pred, y_true, alpha=0.25, gamma=2.0, reduction='mean'):
+        """
+        Focal Loss 实现
+        y_pred: 模型输出的概率 [N]
+        y_true: 真实标签 [N]
+        alpha: 类别平衡权重
+        gamma: 聚焦参数
+        reduction: 损失聚合方式 ('mean', 'sum', 'none')
+        """
+        bce_loss = F.binary_cross_entropy(y_pred, y_true, reduction='none')
+        
+        # 计算 p_t = p if y=1 else 1-p
+        p_t = torch.where(y_true == 1, y_pred, 1 - y_pred)
+        
+        # 计算调制因子 (1 - p_t)^gamma
+        focal_term = (1 - p_t) ** gamma
+        
+        # 应用类别平衡权重 alpha_t
+        alpha_t = torch.where(y_true == 1, alpha, 1 - alpha)
+        loss = alpha_t * focal_term * bce_loss
+        
+        if reduction == 'mean':
+            return loss.mean()
+        elif reduction == 'sum':
+            return loss.sum()
+        return loss
+    
+    # 根据全局变量选择损失函数
+    if FOCAL_LOSS:
+        loss_fn = focal_loss
+        print("Using Focal Loss!")
+    else:
+        loss_fn = F.binary_cross_entropy
+        print("Using Binary Cross-Entropy Loss!")
 
     if model_name in ["atdkt", "simplekt", "stablekt", "bakt_time", "sparsekt"]:
         y = torch.masked_select(ys[0], sm)
         t = torch.masked_select(rshft, sm)
-        # print(f"loss1: {y.shape}")
-        loss1 = binary_cross_entropy(y.double(), t.double())
+        loss1 = loss_fn(y.double(), t.double())
 
         if model.emb_type.find("predcurc") != -1:
             if model.emb_type.find("his") != -1:
@@ -52,54 +92,63 @@ def cal_loss(model, ys, r, rshft, sm, preloss=[]):
             loss = model.l1*loss1+model.l2*ys[1]
         else:
             loss = loss1
+            
     elif model_name in ["rekt"]:
-        # print("ys shape:", ys[0].shape)
-        # print("sm shape:", sm.shape)
-        # y = torch.masked_select(ys[0], sm)
         t = torch.masked_select(rshft, sm)
-        loss = binary_cross_entropy(y.double(), t.double())
+        loss = loss_fn(y.double(), t.double())
 
     elif model_name in ["rkt","dimkt","LSTM_Template","CTNKT","dkt", "dkt_forget", "dkvmn","deep_irt", "kqn", "sakt", "saint", "atkt", "atktfix", "gkt", "skvmn", "hawkes"]:
-
         y = torch.masked_select(ys[0], sm)
         t = torch.masked_select(rshft, sm)
-        loss = binary_cross_entropy(y.double(), t.double())
+        loss = loss_fn(y.double(), t.double())
         
     elif model_name in ["TCN_ABQR"]:
-
         y = torch.masked_select(ys[0], sm)
         t = torch.masked_select(rshft, sm)
-        loss = binary_cross_entropy(y.double(), t.double())
+        loss = loss_fn(y.double(), t.double())
+        
     elif model_name == "dkt+":
         y_curr = torch.masked_select(ys[1], sm)
         y_next = torch.masked_select(ys[0], sm)
         r_curr = torch.masked_select(r, sm)
         r_next = torch.masked_select(rshft, sm)
-        loss = binary_cross_entropy(y_next.double(), r_next.double())
-
-        loss_r = binary_cross_entropy(y_curr.double(), r_curr.double()) # if answered wrong for C in t-1, cur answer for C should be wrong too
+        
+        # 对两个损失都使用 Focal Loss
+        loss = loss_fn(y_next.double(), r_next.double())
+        loss_r = loss_fn(y_curr.double(), r_curr.double())
+        
         loss_w1 = torch.masked_select(torch.norm(ys[2][:, 1:] - ys[2][:, :-1], p=1, dim=-1), sm[:, 1:])
         loss_w1 = loss_w1.mean() / model.num_c
         loss_w2 = torch.masked_select(torch.norm(ys[2][:, 1:] - ys[2][:, :-1], p=2, dim=-1) ** 2, sm[:, 1:])
         loss_w2 = loss_w2.mean() / model.num_c
 
         loss = loss + model.lambda_r * loss_r + model.lambda_w1 * loss_w1 + model.lambda_w2 * loss_w2
+        
     elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","dtransformer"]:
         y = torch.masked_select(ys[0], sm)
         t = torch.masked_select(rshft, sm)
-        loss = binary_cross_entropy(y.double(), t.double()) + preloss[0]
+        loss = loss_fn(y.double(), t.double()) + preloss[0]
+        
     elif model_name == "lpkt":
         y = torch.masked_select(ys[0], sm)
         t = torch.masked_select(rshft, sm)
-        criterion = nn.BCELoss(reduction='none')        
-        loss = criterion(y, t).sum()
+        
+        if FOCAL_LOSS:
+            # 对于 LPKT，使用自定义的 reduction
+            criterion = lambda y_pred, y_true: focal_loss(y_pred, y_true, reduction='sum')
+        else:
+            criterion = nn.BCELoss(reduction='none')
+            
+        loss = criterion(y, t).sum() if not FOCAL_LOSS else criterion(y, t)
     
     return loss
 
 
 def model_forward(model, data, opt=None, rel=None,model_config={}):
     # print(f"model_config5: {model_config}")
-    print("model forward")
+    global ii
+    print(f"model forward{ii}")
+    ii = ii+1
     model_name = model.model_name
     # if model_name in ["dkt_forget", "lpkt"]:
     #     q, c, r, qshft, cshft, rshft, m, sm, d, dshft = data
@@ -347,7 +396,8 @@ def train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, t
         loss_mean = []
         epoch_forward_time = 0.0       # 当前 epoch 的 forward 时间
         epoch_forward_count = 0         # 当前 epoch 的 forward 次数
-
+        global ii
+        ii = 0
         for data in train_loader:
             train_step += 1
             if model.model_name in que_type_models and model.model_name not in ["lpkt", "rkt"]:

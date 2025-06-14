@@ -24,6 +24,7 @@ data/poj
 data/slepemapy
 data/junyi2015
 data/ednet
+data/
 .ipynb_checkpoints
 dev_tools
 tmp*

@@ -8,7 +8,7 @@ dname2paths = {
     "assist2009": "/root/autodl-tmp/pykt_self_version/data/assist2009/skill_builder_data_corrected_collapsed.csv",
     "assist2012": "../data/assist2012/2012-2013-data-with-predictions-4-final.csv",
     "assist2015": "../data/assist2015/2015_100_skill_builders_main_problems.csv",
-    "algebra2005": "../data/algebra2005/algebra_2005_2006_train.txt",
+    "algebra2005": "/root/autodl-tmp/pykt_self_version/data/algebra2005/algebra_2005_2006_train.txt",
     "bridge2algebra2006": "../data/bridge2algebra2006/bridge_to_algebra_2006_2007_train.txt",
     "statics2011": "../data/statics2011/AllData_student_step_2011F.csv",
     "nips_task34": "../data/nips_task34/train_task_3_4.csv",

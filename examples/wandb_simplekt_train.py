@@ -27,8 +27,9 @@ if __name__ == "__main__":
     parser.add_argument("--n_blocks", type=int, default=2)
     parser.add_argument("--learning_rate", type=float, default=1e-4)
 
-    parser.add_argument("--use_wandb", type=int, default=1)
+    parser.add_argument("--use_wandb", type=int, default=0)
     parser.add_argument("--add_uuid", type=int, default=1)
+    parser.add_argument("--predict_after_train", type=int, default=0)
     
     args = parser.parse_args()
 
