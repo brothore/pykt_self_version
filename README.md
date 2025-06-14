@@ -1,89 +1,145 @@
-# pyKT
+# Knowledge Tracing 
 
-[![Downloads](https://pepy.tech/badge/pykt-toolkit)](https://pepy.tech/project/pykt-toolkit)
-[![GitHub Issues](https://img.shields.io/github/issues/pykt-team/pykt-toolkit.svg)](https://github.com/pykt-team/pykt-toolkit/issues)
-[![Documentation](https://img.shields.io/website/http/pykt-team.github.io/index.html?down_color=red&down_message=offline&up_message=online)](https://pykt.org/)
+## Overview
+pykt self version
+## dataset
+This dataset is made up of math exercises, collected from the free online tutoring ASSISTments platform in the school year 2009-2010. The dataset consists of 346,860 interactions, 4,217 students, and 26,688 questions and is widely used and has been the standard benchmark for KT methods over the last decade.
 
-pyKT is a python library build upon PyTorch to train deep learning based knowledge tracing models. The library consists of a standardized set of integrated data preprocessing procedures on more than 7 popular datasets across different domains, 5 detailed prediction scenarios, more than 10 frequently compared DLKT approaches for transparent and extensive experiments. More details about pyKT can see our [website](https://pykt.org/) and [docs](https://pykt-toolkit.readthedocs.io/en/latest/quick_start.html).
-
-
-
+https://sites.google.com/site/assistmentsdata/home/2009-2010-assistment-data/skill-builder-data-2009-2010
 
 ## Installation
-Use the following command to install pyKT:
 
-Create conda envirment.
+### Prerequisites
+- Python 3.7+
+- Conda (recommended)
 
-```
-conda create --name=pykt python=3.7.5
-source activate pykt
-```
-
-
-```
-pip install -U pykt-toolkit -i  https://pypi.python.org/simple 
-
+### Setup
+```bash
+conda create --name=tcn_abqr python=3.7.5
+conda activate tcn_abqr
+pip install -U pykt-toolkit
 ```
 
-## Hyper parameter tunning results
-The hyper parameter tunning results of our experiments about all the DLKT models on various datasets can be found at https://drive.google.com/drive/folders/1MWYXj73Ke3zC6bm3enu1gxQQKAHb37hz?usp=drive_link.
+## Quick Start
 
-## References
-### Projects
+### 1. Data Preparation
+#### Download Dataset
+Place your dataset in the `data/{dataset_name}` folder.
 
-1. https://github.com/hcnoh/knowledge-tracing-collection-pytorch 
-2. https://github.com/arshadshk/SAKT-pytorch 
-3. https://github.com/shalini1194/SAKT 
-4. https://github.com/arshadshk/SAINT-pytorch 
-5. https://github.com/Shivanandmn/SAINT_plus-Knowledge-Tracing- 
-6. https://github.com/arghosh/AKT 
-7. https://github.com/JSLBen/Knowledge-Query-Network-for-Knowledge-Tracing 
-8. https://github.com/xiaopengguo/ATKT 
-9. https://github.com/jhljx/GKT 
-10. https://github.com/THUwangcy/HawkesKT
-11. https://github.com/ApexEDM/iekt
-12. https://github.com/Badstu/CAKT_othermodels/blob/0c28d870c0d5cf52cc2da79225e372be47b5ea83/SKVMN/model.py
-13. https://github.com/bigdata-ustc/EduKTM
-14. https://github.com/shalini1194/RKT
-15. https://github.com/shshen-closer/DIMKT
-16. https://github.com/skewondr/FoLiBi
-17. https://github.com/yxonic/DTransformer
-18. https://github.com/lilstrawberry/ReKT
+#### Preprocessing
+```bash
+cd examples
+python data_preprocess.py --dataset_name=assist2009 --min_seq_len=3 --maxlen=200 --kfold=5
+```
 
-### Papers
+### 2. Training TCN_ABQR
+```bash
+CUDA_VISIBLE_DEVICES=0 nohup python wandb_tcn_abqr_train.py \
+    --dataset_name=assist2009 \
+    --use_wandb=1 \
+    --add_uuid=0 \
+    --num_blocks=2 \
+    > tcn_abqr_train.log &
+```
 
-1. DKT: Deep knowledge tracing 
-2. DKT+: Addressing two problems in deep knowledge tracing via prediction-consistent regularization 
-3. DKT-Forget: Augmenting knowledge tracing by considering forgetting behavior 
-4. KQN: Knowledge query network for knowledge tracing: How knowledge interacts with skills 
-5. DKVMN: Dynamic key-value memory networks for knowledge tracing 
-6. ATKT: Enhancing Knowledge Tracing via Adversarial Training 
-7. GKT: Graph-based knowledge tracing: modeling student proficiency using graph neural network 
-8. SAKT: A self-attentive model for knowledge tracing 
-9. SAINT: Towards an appropriate query, key, and value computation for knowledge tracing 
-10. AKT: Context-aware attentive knowledge tracing 
-11. HawkesKT: Temporal Cross-Effects in Knowledge Tracing
-12. IEKT: Tracing Knowledge State with Individual Cognition and Acquisition Estimation
-13. SKVMN: Knowledge Tracing with Sequential Key-Value Memory Networks
-14. LPKT: Learning Process-consistent Knowledge Tracing
-15. QIKT: Improving Interpretability of Deep Sequential Knowledge Tracing Models with Question-centric Cognitive Representations
-16. RKT: Relation-aware Self-attention for Knowledge Tracing
-17. DIMKT: Assessing Student's Dynamic Knowledge State by Exploring the Question Difficulty Effect
-18. ATDKT: Enhancing Deep Knowledge Tracing with Auxiliary Tasks
-19. simpleKT: A Simple but Tough-to-beat Baseline for Knowledge Tracing
-20. SparseKT: Towards Robust Knowledge Tracing Models via K-sparse Attention
-21. FoLiBiKT: Forgetting-aware Linear Bias for Attentive Knowledge Tracing
-22. DTransformer: Tracing Knowledge Instead of Patterns: Stable Knowledge Tracing with Diagnostic Transformer
-23. stableKT: Enhancing Length Generalization for Attention Based Knowledge Tracing Models with Linear Biases
-24. extraKT: Extending Context Window of Attention Based Knowledge Tracing Models via Length Extrapolation
-25. ReKT: Revisiting Knowledge Tracing: A Simple and Powerful Model
+### 3. Evaluation
+```bash
+python wandb_predict.py \
+    --bz=256 \
+    --save_dir="saved_model" \
+    --fusion_type="late_fusion" \
+    --use_wandb=1
+```
 
+## Hyperparameter Tuning
+
+### 1. Wandb Setup
+1. Create a Wandb account at [wandb.ai](https://wandb.ai)
+2. Add your API key to `configs/wandb.json`
+
+### 2. Generate Sweep Configuration
+```bash
+export PROJECT_NAME="TCN_ABQR_TUNING"
+export DATASET_NAME="assist2009"
+export MODEL_NAME="tcn_abqr"
+export WANDB_API_KEY=your_api_key_here
+export NUMS="0,1,2,3"
+export START_SWEEP=0
+export END_SWEEP=5
+
+python generate_wandb.py \
+    --dataset_names "$DATASET_NAME" \
+    --project_name "$PROJECT_NAME" \
+    --model_names "$MODEL_NAME" \
+    --start_sweep "$START_SWEEP" \
+    --end_sweep "$END_SWEEP" \
+    --new 1
+```
+
+### 3. Launch Sweep
+```bash
+sh ./logsScripts/${PROJECT_NAME}_all_start_${START_SWEEP}_${END_SWEEP}.sh > ./logsScripts/${PROJECT_NAME}.all 2>&1
+
+sh run_all.sh ./logsScripts/${PROJECT_NAME}.all "$START_SWEEP" "$END_SWEEP" "$DATASET_NAME" "$MODEL_NAME" "$NUMS" "$PROJECT_NAME"
+
+sh ./logsScripts/${PROJECT_NAME}_${START_SWEEP}_${END_SWEEP}.sh >> ./logsScripts/${PROJECT_NAME}_${START_SWEEP}_${END_SWEEP}.log &
+```
+
+## Evaluation Pipeline
+
+### 1. Extract Best Models
+```python
+df = wandb_api.get_best_run(dataset_name="assist2009", model_name="tcn_abqr")
+wandb_api.extract_best_models(df, "assist2009", "tcn_abqr",
+                            fpath="../examples/seedwandb/predict.yaml",
+                            wandb_key=your_api_key_here)
+```
+
+### 2. Run Evaluation
+```bash
+sh start_predict.sh > pred.log 2>&1
+WANDB_API_KEY=xxx sh run_all.sh pred.log 0 5 assist2009 tcn_abqr 0 TCN_ABQR_EVAL
+sh start_sweep_0_5.sh
+```
+
+## Utility Scripts
+
+### Resume Sweeps
+```bash
+./logsScripts/resumeSweep_${PROJECT_NAME}_${START_SWEEP}_${END_SWEEP}.sh
+```
+
+### Stop Sweeps
+```bash
+./logsScripts/stopSweep_${PROJECT_NAME}_${START_SWEEP}_${END_SWEEP}.sh
+```
+
+### Kill Sweeps
+```bash
+./logsScripts/killSweep_${PROJECT_NAME}_${START_SWEEP}_${END_SWEEP}.sh
+```
+
+## Results Processing
+```bash
+python wandb_download_result.py --new 0
+python wandb_fusion2csv.py \
+    --project_name "$PROJECT_NAME" \
+    --start_sweep "$START_SWEEP" \
+    --end_sweep "$END_SWEEP" \
+    --interval 10 \
+    --timeout 3000
+```
+
+## Model Architecture
+TCN_ABQR combines:
+- Temporal Convolutional Networks for sequence processing
+- Attention mechanisms for question representation
+- Bidirectional processing of learning sequences
+- Question-response interaction modeling
 
 ## Citation
-
-We now have a [paper](https://arxiv.org/abs/2206.11460?context=cs.CY) you can cite for the our pyKT library:
-
-```bibtex
+If you use this code in your research, please cite:
+```
 @inproceedings{liupykt2022,
   title={pyKT: A Python Library to Benchmark Deep Learning based Knowledge Tracing Models},
   author={Liu, Zitao and Liu, Qiongqiong and Chen, Jiahao and Huang, Shuyan and Tang, Jiliang and Luo, Weiqi},
@@ -91,3 +147,6 @@ We now have a [paper](https://arxiv.org/abs/2206.11460?context=cs.CY) you can ci
   year={2022}
 }
 ```
+
+## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
