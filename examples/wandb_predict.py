@@ -4,7 +4,7 @@ import json
 import copy
 import torch
 import pandas as pd
-
+from pykt.config import ERR_PATH,stu_pk,SET_TARGET_STU
 from pykt.models import evaluate, evaluate_question, load_model
 from pykt.datasets import init_test_datasets
 
@@ -77,19 +77,23 @@ def main(params):
         else:
             fname = "phi_array" + folds_str + ".pkl"
             rel = pd.read_pickle(os.path.join(dpath, fname))
-
-    if model.model_name == "rkt":
-        testauc, testacc = evaluate(model, test_loader, model_name, rel, save_test_path)
+    if ERR_PATH:
+        save_result_path = os.path.join(data_config["dpath"],f"predict_result_{stu_pk}.csv")
+        print(f"保存到这个目录{save_result_path}")
     else:
-        testauc, testacc = evaluate(model, test_loader, model_name, save_test_path)
+        save_result_path = ""
+    if model.model_name == "rkt":
+        testauc, testacc = evaluate(model, test_loader, model_name, rel, save_test_path,save_result_path)
+    else:
+        testauc, testacc = evaluate(model, test_loader, model_name, save_test_path,save_result_path)
     print(f"testauc: {testauc}, testacc: {testacc}")
 
     window_testauc, window_testacc = -1, -1
     save_test_window_path = os.path.join(save_dir, f"{model.emb_type}_test_window_predictions.txt")
     if model.model_name == "rkt":
-        window_testauc, window_testacc = evaluate(model, test_window_loader, model_name, rel, save_test_window_path)
+        window_testauc, window_testacc = evaluate(model, test_window_loader, model_name, rel)
     else:
-        window_testauc, window_testacc = evaluate(model, test_window_loader, model_name, save_test_window_path)
+        window_testauc, window_testacc = evaluate(model, test_window_loader, model_name)
     print(f"testauc: {testauc}, testacc: {testacc}, window_testauc: {window_testauc}, window_testacc: {window_testacc}")
 
     dres = {
@@ -124,7 +128,10 @@ def main(params):
     print(f"windowacclate_mean: {dres['windowacclate_mean']}")
     
     # 将评估结果保存到 save_dir 目录下的 evaluation_results.json 文件
-    results_path = os.path.join(save_dir, "evaluation_results.json")
+    if SET_TARGET_STU != 0:
+        results_path = os.path.join(save_dir, f"evaluation_results_{SET_TARGET_STU}.json")
+    else:    
+        results_path = os.path.join(save_dir, "evaluation_results.json")
     try:
         with open(results_path, "w") as fout:
             json.dump(dres, fout, indent=4, ensure_ascii=False)

@@ -58,7 +58,7 @@ def main():
     wandb.login(key=WANDB_API_KEY)
 
     # 初始化 Wandb API
-    api = wandb.Api()
+    api = wandb.Api(timeout=60)
 
     # 指定项目路径，例如 "username/project_name"
     username = "byoung9527-Jinan University"
