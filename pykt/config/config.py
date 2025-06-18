@@ -6,7 +6,7 @@ que_type_models += qikt_ab_models
 
 PRINT_DATA_PROCESS = 1
 
-SET_TARGET_STU = 1003
+SET_TARGET_STU = 0
 #pk ph pt 1 2 3 4-13
 #三个学生
 FOCAL_LOSS = 0
@@ -14,5 +14,7 @@ ERR_PATH = 1
 ONLY_ERR = 0
 SAVE_RESULT = 1
 stu_pk  ="pk"
+
+MULTI_LEVEL_TRAIN = 1
 
  

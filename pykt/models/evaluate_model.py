@@ -140,7 +140,7 @@ def evaluate(model, test_loader, model_name, rel=None, save_path="", save_io_pat
             elif model_name in ["rekt"]:
                 y = model(dcur)
             elif model_name in ["dkt", "dkt+","LSTM_Template","CTNKT"]:
-                y = model(c.long(), r.long())
+                y,_ = model(c.long(), r.long())
                 y = (y * one_hot(cshft.long(), model.num_c)).sum(-1)
 
                 #全1

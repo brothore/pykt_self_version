@@ -304,6 +304,9 @@
         "emb_path": "",
         "train_valid_original_file": "train_valid.csv",
         "train_valid_file": "train_valid_sequences.csv",
+        "level1_train_valid_file": "train_level1.csv",
+        "level2_train_valid_file": "train_level2.csv",
+        "level3_train_valid_file": "train_level3.csv",
         "folds": [
             0,
             1,
@@ -316,6 +319,7 @@
         "test_window_file": "test_window_sequences.csv",
         "test_question_file": "test_question_sequences.csv",
         "test_question_window_file": "test_question_window_sequences.csv",
+        "mod_test_question_window_file": "modified_test_question_window_sequences.csv",
         "pk_test_question_window_file": "pk.csv",
         "ph_test_question_window_file": "ph.csv",
         "pt_test_question_window_file": "pt.csv",

@@ -37,4 +37,4 @@ class DKT(Module):
         print(f"out.shape is {y.shape}")
         y = torch.sigmoid(y)
 
-        return y
+        return y,xemb

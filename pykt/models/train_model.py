@@ -1,6 +1,8 @@
 import os, sys
 import torch
 import torch.nn as nn
+from collections import Counter
+from imblearn.over_sampling import SMOTE
 from torch.nn.functional import one_hot, binary_cross_entropy, cross_entropy
 from torch.nn.utils.clip_grad import clip_grad_norm_
 import numpy as np
@@ -10,11 +12,13 @@ from .atkt import _l2_normalize_adv
 from ..utils.utils import debug_print
 from pykt.config import que_type_models
 from pykt.config import FOCAL_LOSS
+from pykt.config import MULTI_LEVEL_TRAIN
 import pandas as pd
 import time  # 导入时间模块
 import pykt.models.glo
 import traceback
 from pykt.models.TCN_ABQR import BGRL
+from itertools import zip_longest
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ii = 0
 TCN_ABQR = 0
@@ -38,6 +42,286 @@ def save_results_to_file(results, folder_path, file_name="results.txt"):
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+def collect_embeddings_from_loader(model, data_loader, device):
+    """从数据加载器中收集嵌入向量"""
+    model.eval()
+    all_embeddings = []
+    all_labels = []
+    
+    with torch.no_grad():
+        for data in data_loader:
+            # 解析数据
+            dcur = data
+            q, c, r = dcur["qseqs"].to(device), dcur["cseqs"].to(device), dcur["rseqs"].to(device)
+            qshft, cshft, rshft = dcur["shft_qseqs"].to(device), dcur["shft_cseqs"].to(device), dcur["shft_rseqs"].to(device)
+            m, sm = dcur["masks"].to(device), dcur["smasks"].to(device)
+            
+            # DKT前向传播获取嵌入
+            if model.model_name == "dkt":
+                y, xemb = model(c.long(), r.long())
+                
+                # 收集有效的嵌入向量和对应的标签
+                valid_mask = sm.bool()  # 使用shifted mask来确定有效位置
+                
+                # 展平处理
+                xemb_flat = xemb.view(-1, xemb.size(-1))  # [batch_size * seq_len, emb_size]
+                rshft_flat = rshft.view(-1)  # [batch_size * seq_len]
+                valid_mask_flat = valid_mask.view(-1)  # [batch_size * seq_len]
+                
+                # 只取有效位置的数据
+                valid_embeddings = xemb_flat[valid_mask_flat]
+                valid_labels = rshft_flat[valid_mask_flat]
+                
+                all_embeddings.append(valid_embeddings.cpu().numpy())
+                all_labels.append(valid_labels.cpu().numpy())
+    
+    # 合并所有批次的数据
+    all_embeddings = np.vstack(all_embeddings)
+    all_labels = np.hstack(all_labels)
+    
+    return all_embeddings, all_labels
+
+
+def create_smote_dataloader(embeddings1, labels1, embeddings3, labels3, batch_size=32, device='cuda'):
+    """使用SMOTE创建新的数据加载器"""
+    # 合并level1和level3的数据
+    combined_embeddings = np.vstack([embeddings1, embeddings3])
+    combined_labels = np.hstack([labels1, labels3])
+    
+    print(f"SMOTE前数据分布: {Counter(combined_labels)}")
+    
+    # 使用SMOTE进行过采样
+    smote = SMOTE(random_state=42, k_neighbors=min(5, len(combined_embeddings) - 1))
+    
+    try:
+        resampled_embeddings, resampled_labels = smote.fit_resample(combined_embeddings, combined_labels)
+        print(f"SMOTE后数据分布: {Counter(resampled_labels)}")
+        
+        # 转换为torch张量
+        embeddings_tensor = torch.FloatTensor(resampled_embeddings).to(device)
+        labels_tensor = torch.LongTensor(resampled_labels).to(device)
+        
+        # 创建数据集和数据加载器
+        dataset = TensorDataset(embeddings_tensor, labels_tensor)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        
+        return dataloader
+    
+    except Exception as e:
+        print(f"SMOTE失败: {e}")
+        # 如果SMOTE失败，返回原始数据
+        embeddings_tensor = torch.FloatTensor(combined_embeddings).to(device)
+        labels_tensor = torch.LongTensor(combined_labels).to(device)
+        dataset = TensorDataset(embeddings_tensor, labels_tensor)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        
+        return dataloader
+
+
+def model_forward_with_smote_data(model, smote_data, device):
+    """处理SMOTE生成的数据进行训练"""
+    embeddings, labels = smote_data
+    embeddings = embeddings.to(device)
+    labels = labels.to(device)
+    
+    # 从嵌入直接到LSTM层（跳过embedding层）
+    h, _ = model.lstm_layer(embeddings.unsqueeze(1))  # 添加序列维度
+    h = model.dropout_layer(h)
+    y = model.out_layer(h)
+    y = torch.sigmoid(y).squeeze(1)  # 移除序列维度
+    
+    # 计算损失
+    loss = torch.nn.functional.binary_cross_entropy(y, labels.float())
+    
+    return loss
+
+
+def train_model_multilevel(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, 
+                          level1_loader=None, level3_loader=None, freeze_epoch=10,
+                          test_loader=None, test_window_loader=None, save_model=False, 
+                          data_config=None, fold=None, emb_sizess=128, model_config={}):
+    """改进的多级训练函数"""
+    max_auc, best_epoch = 0, -1
+    train_step = 0
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # 检查是否启用多级训练
+    if MULTI_LEVEL_TRAIN != 1:
+        print("使用原始训练方式")
+        return train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path,
+                          test_loader, test_window_loader, save_model, data_config, fold,
+                          emb_sizess, model_config, level1_loader, level3_loader)
+    
+    print("使用多级训练方式")
+    
+    # 检查必要的数据加载器
+    if level1_loader is None or level3_loader is None:
+        print("警告: level1_loader 或 level3_loader 为空，使用原始训练方式")
+        return train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path,
+                          test_loader, test_window_loader, save_model, data_config, fold,
+                          emb_sizess, model_config, level1_loader, level3_loader)
+    
+    smote_dataloader = None
+    model_frozen = False
+    
+    for i in range(1, num_epochs + 1):
+        loss_mean = []
+        
+        # 第一阶段：正常训练到指定epoch
+        if i <= freeze_epoch:
+            model.train()
+            for data in train_loader:
+                train_step += 1
+                
+                # DKT前向传播
+                loss = model_forward(model, data)
+                
+                opt.zero_grad()
+                loss.backward()
+                opt.step()
+                
+                loss_mean.append(loss.detach().cpu().numpy())
+        
+        # 在指定epoch后进行SMOTE数据增强
+        elif i == freeze_epoch + 1:
+            print(f"在第{i}个epoch进行SMOTE数据增强...")
+            
+            # 冻结模型权重，收集嵌入
+            print("冻结模型权重，收集嵌入向量...")
+            for param in model.parameters():
+                param.requires_grad = False
+            model_frozen = True
+            
+            # 从level2和level3数据中收集嵌入
+            print("从level1数据收集嵌入...")
+            embeddings2, labels2 = collect_embeddings_from_loader(model, level1_loader, device)
+            
+            print("从level3数据收集嵌入...")
+            embeddings3, labels3 = collect_embeddings_from_loader(model, level3_loader, device)
+            
+            # 使用SMOTE创建新的数据加载器
+            print("使用SMOTE创建增强数据...")
+            smote_dataloader = create_smote_dataloader(
+                embeddings2, labels2, embeddings3, labels3, 
+                batch_size=32, device=device
+            )
+            
+            # 解冻模型权重
+            print("解冻模型权重...")
+            for param in model.parameters():
+                param.requires_grad = True
+            model_frozen = False
+            
+            # 继续训练
+            model.train()
+            
+            # 在原始数据上训练
+            for data in train_loader:
+                train_step += 1
+                loss = model_forward(model, data)
+                
+                opt.zero_grad()
+                loss.backward()
+                opt.step()
+                
+                loss_mean.append(loss.detach().cpu().numpy())
+            
+            # 在SMOTE数据上训练
+            if smote_dataloader is not None:
+                for smote_data in smote_dataloader:
+                    train_step += 1
+                    loss = model_forward_with_smote_data(model, smote_data, device)
+                    
+                    opt.zero_grad()
+                    loss.backward()
+                    opt.step()
+                    
+                    loss_mean.append(loss.detach().cpu().numpy())
+        
+        # 第三阶段：继续在原始数据和SMOTE数据上训练
+        else:
+            model.train()
+            
+            # 在原始数据上训练
+            for data in train_loader:
+                train_step += 1
+                loss = model_forward(model, data)
+                
+                opt.zero_grad()
+                loss.backward()
+                opt.step()
+                
+                loss_mean.append(loss.detach().cpu().numpy())
+            
+            # 在SMOTE数据上训练（如果存在）
+            if smote_dataloader is not None:
+                for smote_data in smote_dataloader:
+                    train_step += 1
+                    loss = model_forward_with_smote_data(model, smote_data, device)
+                    
+                    opt.zero_grad()
+                    loss.backward()
+                    opt.step()
+                    
+                    loss_mean.append(loss.detach().cpu().numpy())
+        
+        # 计算平均损失
+        loss_mean = np.mean(loss_mean)
+        
+        # 验证模型
+        auc, acc = evaluate(model, valid_loader, model.model_name)
+        
+        # 保存最佳模型
+        if auc > max_auc + 1e-3:
+            if save_model:
+                torch.save(model.state_dict(), os.path.join(ckpt_path, model.emb_type + "_model.ckpt"))
+            max_auc = auc
+            best_epoch = i
+            testauc, testacc = -1, -1
+            window_testauc, window_testacc = -1, -1
+            if not save_model:
+                if test_loader is not None:
+                    save_test_path = os.path.join(ckpt_path, model.emb_type + "_test_predictions.txt")
+                    testauc, testacc = evaluate(model, test_loader, model.model_name, save_test_path)
+                if test_window_loader is not None:
+                    save_test_path = os.path.join(ckpt_path, model.emb_type + "_test_window_predictions.txt")
+                    window_testauc, window_testacc = evaluate(model, test_window_loader, model.model_name, save_test_path)
+            validauc, validacc = auc, acc
+        
+        # 打印训练信息
+        print(f"Epoch: {i}, validauc: {validauc:.4}, validacc: {validacc:.4}, best epoch: {best_epoch}, best auc: {max_auc:.4}, train loss: {loss_mean}, emb_type: {model.emb_type}, model: {model.model_name}")
+        print(f"            testauc: {round(testauc,4)}, testacc: {round(testacc,4)}, window_testauc: {round(window_testauc,4)}, window_testacc: {round(window_testacc,4)}")
+        
+        if i == freeze_epoch + 1:
+            print(f"            已完成SMOTE数据增强，继续训练...")
+        
+        # 早停机制
+        if i - best_epoch >= 10:
+            break
+    
+    # 确保模型权重被解冻
+    if model_frozen:
+        for param in model.parameters():
+            param.requires_grad = True
+    
+    print("多级训练完成！")
+    
+    # 保存最终结果
+    results = {
+        "Training Method": "Multi-Level with SMOTE",
+        "Freeze Epoch": freeze_epoch,
+        "Best Epoch": best_epoch,
+        "Best AUC": max_auc,
+        "Valid AUC": validauc,
+        "Valid Accuracy": validacc,
+        "Test AUC": testauc,
+        "Test Accuracy": testacc,
+        "Window Test AUC": window_testauc,
+        "Window Test Accuracy": window_testacc
+    }
+    save_results_to_file(results, ckpt_path)
+    
+    return testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch
 
 def cal_loss(model, ys, r, rshft, sm, preloss=[]):
     model_name = model.model_name
@@ -144,7 +428,7 @@ def cal_loss(model, ys, r, rshft, sm, preloss=[]):
     return loss
 
 
-def model_forward(model, data, opt=None, rel=None,model_config={}):
+def model_forward(model, data, opt=None, rel=None,model_config={},data_label=0):
     # print(f"model_config5: {model_config}")
     global ii
     print(f"model forward{ii}")
@@ -200,7 +484,9 @@ def model_forward(model, data, opt=None, rel=None,model_config={}):
         # cat = torch.cat((d["at_seqs"][:,0:1], dshft["at_seqs"]), dim=1)
         cit = torch.cat((dcur["itseqs"][:,0:1], dcur["shft_itseqs"]), dim=1)
     if model_name in ["dkt"]:
-        y = model(c.long(), r.long())
+        
+
+        y,_ = model(c.long(), r.long())
         # print(f"y shape{y.shape}")
         # print(f"cshft shape{cshft.long().shape}")
 
@@ -367,145 +653,156 @@ def model_forward(model, data, opt=None, rel=None,model_config={}):
     return loss
     
 
-def train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, test_loader=None, test_window_loader=None, save_model=False, data_config=None, fold=None,emb_sizess=128,model_config={}):
-    max_auc, best_epoch = 0, -1
-    train_step = 0
-    # print(f"model_config3: {model_config}")
-    rel = None
-    if model.model_name == "rkt":
-        dpath = data_config["dpath"]
-        dataset_name = dpath.split("/")[-1]
-        tmp_folds = set(data_config["folds"]) - {fold}
-        folds_str = "_" + "_".join([str(_) for _ in tmp_folds])
-        if dataset_name in ["algebra2005", "bridge2algebra2006"]:
-            fname = "phi_dict" + folds_str + ".pkl"
-            rel = pd.read_pickle(os.path.join(dpath, fname))
-        else:
-            fname = "phi_array" + folds_str + ".pkl" 
-            rel = pd.read_pickle(os.path.join(dpath, fname))
-
-    if model.model_name=='lpkt':
-        scheduler = torch.optim.lr_scheduler.StepLR(opt, 10, gamma=0.5)
-    
-    total_forward_time = 0.0  # 累计所有 forward 的时间
-    total_epoch_time = 0.0    # 累计所有 epoch 的时间
-    total_forward_count = 0    # 累计所有 forward 的次数
-
-    for i in range(1, num_epochs + 1):
-        epoch_start_time = time.time()  # 记录 epoch 开始时间
-        loss_mean = []
-        epoch_forward_time = 0.0       # 当前 epoch 的 forward 时间
-        epoch_forward_count = 0         # 当前 epoch 的 forward 次数
-        global ii
-        ii = 0
-        for data in train_loader:
-            train_step += 1
-            if model.model_name in que_type_models and model.model_name not in ["lpkt", "rkt"]:
-                model.model.train()
+def train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, test_loader=None, test_window_loader=None, save_model=False, data_config=None, fold=None,emb_sizess=128,model_config={},level1_loader=None,level3_loader=None):
+    freeze_epoch = 10
+    if MULTI_LEVEL_TRAIN == 1:
+        # 使用多级训练
+        return train_model_multilevel(
+            model, train_loader, valid_loader, num_epochs, opt, ckpt_path,
+            level1_loader, level3_loader, freeze_epoch, 
+            test_loader, test_window_loader, save_model, data_config, fold, emb_sizess, model_config
+        )
+    else:
+        max_auc, best_epoch = 0, -1
+        train_step = 0
+        # print(f"model_config3: {model_config}")
+        rel = None
+        if model.model_name == "rkt":
+            dpath = data_config["dpath"]
+            dataset_name = dpath.split("/")[-1]
+            tmp_folds = set(data_config["folds"]) - {fold}
+            folds_str = "_" + "_".join([str(_) for _ in tmp_folds])
+            if dataset_name in ["algebra2005", "bridge2algebra2006"]:
+                fname = "phi_dict" + folds_str + ".pkl"
+                rel = pd.read_pickle(os.path.join(dpath, fname))
             else:
-                model.train()
-            
-            # 记录 forward 开始时间
-            forward_start = time.time()
-            
-            if model.model_name=='rkt':
-                loss = model_forward(model, data, rel)
-            elif model.model_name=='TCN_ABQR':
-                print("entered_here!")
-                print(f"model_config4: {model_config}")
-                loss = model_forward(model, data,opt, rel,model_config=model_config)
-            else:
+                fname = "phi_array" + folds_str + ".pkl" 
+                rel = pd.read_pickle(os.path.join(dpath, fname))
+
+        if model.model_name=='lpkt':
+            scheduler = torch.optim.lr_scheduler.StepLR(opt, 10, gamma=0.5)
+        
+        total_forward_time = 0.0  # 累计所有 forward 的时间
+        total_epoch_time = 0.0    # 累计所有 epoch 的时间
+        total_forward_count = 0    # 累计所有 forward 的次数
+
+        for i in range(1, num_epochs + 1):
+            epoch_start_time = time.time()  # 记录 epoch 开始时间
+            loss_mean = []
+            epoch_forward_time = 0.0       # 当前 epoch 的 forward 时间
+            epoch_forward_count = 0         # 当前 epoch 的 forward 次数
+            global ii
+            ii = 0
+
                 
-                loss = model_forward(model, data)
+                
+            for data in train_loader:
+                train_step += 1
+                if model.model_name in que_type_models and model.model_name not in ["lpkt", "rkt"]:
+                    model.model.train()
+                else:
+                    model.train()
+                
+                # 记录 forward 开始时间
+                forward_start = time.time()
+                
+                if model.model_name=='rkt':
+                    loss = model_forward(model, data, rel)
+                elif model.model_name=='TCN_ABQR':
+                    print("entered_here!")
+                    print(f"model_config4: {model_config}")
+                    loss = model_forward(model, data,opt, rel,model_config=model_config)
+                else:
+                    loss = model_forward(model, data)
+                
+                # 记录 forward 结束时间
+                forward_end = time.time()
+                forward_duration = forward_end - forward_start
+
+                # 更新时间统计
+                epoch_forward_time += forward_duration
+                epoch_forward_count += 1
+                total_forward_time += forward_duration
+                total_forward_count += 1
+                if model.model_name != "TCN_ABQR":
+                    opt.zero_grad()
+                    loss.backward()  # 计算梯度
+                if model.model_name == "rkt":
+                    clip_grad_norm_(model.parameters(), model.grad_clip)
+                if model.model_name == "dtransformer":
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                opt.step()  # 更新模型参数
+
+                loss_mean.append(loss.detach().cpu().numpy())
+                if model.model_name == "gkt" and train_step % 10 == 0:
+                    text = f"Total train step is {train_step}, the loss is {loss.item():.5}"
+                    debug_print(text=text, fuc_name="train_model")
             
-            # 记录 forward 结束时间
-            forward_end = time.time()
-            forward_duration = forward_end - forward_start
+            if model.model_name == 'lpkt':
+                scheduler.step()  # 更新学习率
 
-            # 更新时间统计
-            epoch_forward_time += forward_duration
-            epoch_forward_count += 1
-            total_forward_time += forward_duration
-            total_forward_count += 1
-            if model.model_name != "TCN_ABQR":
-                opt.zero_grad()
-                loss.backward()  # 计算梯度
-            if model.model_name == "rkt":
-                clip_grad_norm_(model.parameters(), model.grad_clip)
-            if model.model_name == "dtransformer":
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            opt.step()  # 更新模型参数
+            loss_mean = np.mean(loss_mean)
+            
+            if model.model_name == 'rkt':
+                auc, acc = evaluate(model, valid_loader, model.model_name, rel)
+            else:
+                auc, acc = evaluate(model, valid_loader, model.model_name)
 
-            loss_mean.append(loss.detach().cpu().numpy())
-            if model.model_name == "gkt" and train_step % 10 == 0:
-                text = f"Total train step is {train_step}, the loss is {loss.item():.5}"
-                debug_print(text=text, fuc_name="train_model")
-        
-        if model.model_name == 'lpkt':
-            scheduler.step()  # 更新学习率
+            if auc > max_auc + 1e-3:
+                if save_model:
+                    torch.save(model.state_dict(), os.path.join(ckpt_path, model.emb_type + "_model.ckpt"))
+                max_auc = auc
+                best_epoch = i
+                testauc, testacc = -1, -1
+                window_testauc, window_testacc = -1, -1
+                if not save_model:
+                    if test_loader is not None:
+                        save_test_path = os.path.join(ckpt_path, model.emb_type + "_test_predictions.txt")
+                        testauc, testacc = evaluate(model, test_loader, model.model_name, save_test_path)
+                    if test_window_loader is not None:
+                        save_test_path = os.path.join(ckpt_path, model.emb_type + "_test_window_predictions.txt")
+                        window_testauc, window_testacc = evaluate(model, test_window_loader, model.model_name, save_test_path)
+                validauc, validacc = auc, acc
+            
+            epoch_end_time = time.time()  # 记录 epoch 结束时间
+            epoch_duration = epoch_end_time - epoch_start_time
+            total_epoch_time += epoch_duration
 
-        loss_mean = np.mean(loss_mean)
-        
-        if model.model_name == 'rkt':
-            auc, acc = evaluate(model, valid_loader, model.model_name, rel)
-        else:
-            auc, acc = evaluate(model, valid_loader, model.model_name)
+            # 计算当前 epoch 的平均 forward 时间
+            avg_forward_time_epoch = epoch_forward_time / epoch_forward_count if epoch_forward_count > 0 else 0.0
 
-        if auc > max_auc + 1e-3:
-            if save_model:
-                torch.save(model.state_dict(), os.path.join(ckpt_path, model.emb_type + "_model.ckpt"))
-            max_auc = auc
-            best_epoch = i
-            testauc, testacc = -1, -1
-            window_testauc, window_testacc = -1, -1
-            if not save_model:
-                if test_loader is not None:
-                    save_test_path = os.path.join(ckpt_path, model.emb_type + "_test_predictions.txt")
-                    testauc, testacc = evaluate(model, test_loader, model.model_name, save_test_path)
-                if test_window_loader is not None:
-                    save_test_path = os.path.join(ckpt_path, model.emb_type + "_test_window_predictions.txt")
-                    window_testauc, window_testacc = evaluate(model, test_window_loader, model.model_name, save_test_path)
-            validauc, validacc = auc, acc
-        
-        epoch_end_time = time.time()  # 记录 epoch 结束时间
-        epoch_duration = epoch_end_time - epoch_start_time
-        total_epoch_time += epoch_duration
+            print(f"Epoch: {i}, validauc: {validauc:.4}, validacc: {validacc:.4}, best epoch: {best_epoch}, best auc: {max_auc:.4}, train loss: {loss_mean}, emb_type: {model.emb_type}, model: {model.model_name}, save_dir: {ckpt_path}")
+            print(f"            testauc: {round(testauc,4)}, testacc: {round(testacc,4)}, window_testauc: {round(window_testauc,4)}, window_testacc: {round(window_testacc,4)}")
+            print(f"            Avg Forward Time this Epoch: {avg_forward_time_epoch:.6f} seconds")
 
-        # 计算当前 epoch 的平均 forward 时间
-        avg_forward_time_epoch = epoch_forward_time / epoch_forward_count if epoch_forward_count > 0 else 0.0
+            # 检查是否提前停止
+            if i - best_epoch >= 10:
+                break
 
-        print(f"Epoch: {i}, validauc: {validauc:.4}, validacc: {validacc:.4}, best epoch: {best_epoch}, best auc: {max_auc:.4}, train loss: {loss_mean}, emb_type: {model.emb_type}, model: {model.model_name}, save_dir: {ckpt_path}")
-        print(f"            testauc: {round(testauc,4)}, testacc: {round(testacc,4)}, window_testauc: {round(window_testauc,4)}, window_testacc: {round(window_testacc,4)}")
-        print(f"            Avg Forward Time this Epoch: {avg_forward_time_epoch:.6f} seconds")
+        # 训练结束后，计算所有 forward 的平均时间和所有 epoch 的平均时间
+        overall_avg_forward_time = total_forward_time / total_forward_count if total_forward_count > 0 else 0.0
+        avg_epoch_time = total_epoch_time / i if i > 0 else 0.0
 
-        # 检查是否提前停止
-        if i - best_epoch >= 10:
-            break
+        print("\n训练结束！")
+        print(f"每个 forward 的总体平均时间: {overall_avg_forward_time:.6f} 秒")
+        print(f"每个 epoch 的平均时间: {avg_epoch_time:.2f} 秒")
 
-    # 训练结束后，计算所有 forward 的平均时间和所有 epoch 的平均时间
-    overall_avg_forward_time = total_forward_time / total_forward_count if total_forward_count > 0 else 0.0
-    avg_epoch_time = total_epoch_time / i if i > 0 else 0.0
+        # 保存最终结果
+        results = {
+            "Best Epoch": best_epoch,
+            "Best AUC": max_auc,
+            "Valid AUC": validauc,
+            "Valid Accuracy": validacc,
+            "Test AUC": testauc,
+            "Test Accuracy": testacc,
+            "Window Test AUC": window_testauc,
+            "Window Test Accuracy": window_testacc,
+            "Overall Avg Forward Time": overall_avg_forward_time,
+            "Avg Epoch Time": avg_epoch_time
+        }
+        save_results_to_file(results, ckpt_path)
 
-    print("\n训练结束！")
-    print(f"每个 forward 的总体平均时间: {overall_avg_forward_time:.6f} 秒")
-    print(f"每个 epoch 的平均时间: {avg_epoch_time:.2f} 秒")
-
-    # 保存最终结果
-    results = {
-        "Best Epoch": best_epoch,
-        "Best AUC": max_auc,
-        "Valid AUC": validauc,
-        "Valid Accuracy": validacc,
-        "Test AUC": testauc,
-        "Test Accuracy": testacc,
-        "Window Test AUC": window_testauc,
-        "Window Test Accuracy": window_testacc,
-        "Overall Avg Forward Time": overall_avg_forward_time,
-        "Avg Epoch Time": avg_epoch_time
-    }
-    save_results_to_file(results, ckpt_path)
-
-    return testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch
+        return testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch
 
 
 def auto_load_BGRL(pro_embed, Q_matrix, perb,model_config,mm,force_retrain=False):

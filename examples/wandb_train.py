@@ -9,7 +9,8 @@ import copy
 
 from pykt.models import train_model,evaluate,init_model
 from pykt.utils import debug_print,set_seed
-from pykt.datasets import init_dataset4train
+from pykt.datasets import init_dataset4train,init_dataset4train_multi
+from pykt.config import MULTI_LEVEL_TRAIN
 import datetime
 XIE_LOU_TEST = 0
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
@@ -70,7 +71,11 @@ def main(params):
     
     debug_print(text="init_dataset",fuc_name="main")
     if model_name not in ["dimkt"]:
-        train_loader, valid_loader, *_ = init_dataset4train(dataset_name, model_name, data_config, fold, batch_size)
+        if MULTI_LEVEL_TRAIN == 1:
+            train_loader, valid_loader, *_,level1_loader,level3_loader = init_dataset4train_multi(dataset_name, model_name, data_config, fold, batch_size)
+        else:
+            
+            train_loader, valid_loader, *_ = init_dataset4train(dataset_name, model_name, data_config, fold, batch_size)
     else:
         diff_level = params["difficult_levels"]
         train_loader, valid_loader, *_ = init_dataset4train(dataset_name, model_name, data_config, fold, batch_size, diff_level=diff_level)
@@ -140,8 +145,13 @@ def main(params):
     debug_print(text = "train model",fuc_name="main")
     
     if model_name == "rkt":
-        testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch = \
-            train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, None, None, save_model, data_config[dataset_name], fold)
+        if MULTI_LEVEL_TRAIN == 1:
+            # print(f"======================={level3_loader is not None},{level1_loader is not None}")
+            testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch = \
+                train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, None, None, save_model, data_config[dataset_name], fold,level1_loader=level1_loader,level3_loader=level3_loader) 
+        else:    
+            testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch = \
+                train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, None, None, save_model, data_config[dataset_name], fold)
     elif model_name == "TCN_ABQR":
         model_config["dataset_path"] = data_config[dataset_name]['dpath']
         model_config["num_c"] = data_config[dataset_name]['num_c']
@@ -154,8 +164,15 @@ def main(params):
         if XIE_LOU_TEST :
             pass
         else:
+            if MULTI_LEVEL_TRAIN == 1:
+                testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch = \
+                train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, None, None, save_model, fold,level1_loader=level1_loader,level3_loader=level3_loader,emb_sizess=emb_size) 
+            else:
+                testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch = train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, None, None, save_model,emb_sizess=emb_size)
+            
+            
             # print(f"aaa emb{emb_size}")
-            testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch = train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, None, None, save_model,emb_sizess=emb_size)
+            
 
     if save_model:
         best_model = init_model(model_name, model_config, data_config[dataset_name], emb_type)
