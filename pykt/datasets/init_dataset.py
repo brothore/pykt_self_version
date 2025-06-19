@@ -122,12 +122,12 @@ def init_test_datasets(data_config, model_name, batch_size, diff_level=None, arg
                 test_question_window_dataset = KTDataset(os.path.join(data_config["dpath"], f"level2.csv"), data_config["input_type"], {-1}, True)
             elif stu_id == 1003:
                 test_question_window_dataset = KTDataset(os.path.join(data_config["dpath"], f"level3.csv"), data_config["input_type"], {-1}, True)
-            elif stu_id == 1004:
-                test_question_window_dataset = KTDataset(os.path.join(data_config["dpath"], f"modified_level1.csv"), data_config["input_type"], {-1}, True)
-            elif stu_id == 1005:
-                test_question_window_dataset = KTDataset(os.path.join(data_config["dpath"], f"modified_level2.csv"), data_config["input_type"], {-1}, True)
-            elif stu_id == 1006:
-                test_question_window_dataset = KTDataset(os.path.join(data_config["dpath"], f"modified_level3.csv"), data_config["input_type"], {-1}, True)
+            # elif stu_id == 1004:
+            #     test_question_window_dataset = KTDataset(os.path.join(data_config["dpath"], f"modified_level1.csv"), data_config["input_type"], {-1}, True)
+            # elif stu_id == 1005:
+            #     test_question_window_dataset = KTDataset(os.path.join(data_config["dpath"], f"modified_level2.csv"), data_config["input_type"], {-1}, True)
+            # elif stu_id == 1006:
+            #     test_question_window_dataset = KTDataset(os.path.join(data_config["dpath"], f"modified_level3.csv"), data_config["input_type"], {-1}, True)
             
             else:
                 test_question_window_dataset = KTDataset(os.path.join(data_config["dpath"], f"top_{stu_id-3}_student.csv"), data_config["input_type"], {-1}, True)
@@ -347,11 +347,13 @@ def init_dataset4train_multi(dataset_name, model_name, data_config, i, batch_siz
         curtrain = KTDataset(os.path.join(data_config["dpath"], data_config["train_valid_file"]), data_config["input_type"], all_folds - {i})
         
         level1 = KTDataset(os.path.join(data_config["dpath"], data_config["level1_train_valid_file"]), data_config["input_type"], all_folds - {i})
+        level2 = KTDataset(os.path.join(data_config["dpath"], data_config["level2_train_valid_file"]), data_config["input_type"], all_folds - {i})
         
         level3 = KTDataset(os.path.join(data_config["dpath"], data_config["level3_train_valid_file"]), data_config["input_type"], all_folds - {i})
     train_loader = DataLoader(curtrain, batch_size=batch_size)
     valid_loader = DataLoader(curvalid, batch_size=batch_size)
     level1_loader = DataLoader(level1, batch_size=batch_size)
+    level2_loader = DataLoader(level2, batch_size=batch_size)
     level3_loader = DataLoader(level3, batch_size=batch_size)
     
     try:
@@ -385,4 +387,4 @@ def init_dataset4train_multi(dataset_name, model_name, data_config, i, batch_siz
     # test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     # # test_window_loader = DataLoader(test_window_dataset, batch_size=batch_size, shuffle=False)
     # test_window_loader = None
-    return train_loader, valid_loader,level1_loader,level3_loader#, test_loader, test_window_loader
+    return train_loader, valid_loader,level1_loader,level2_loader,level3_loader#, test_loader, test_window_loader

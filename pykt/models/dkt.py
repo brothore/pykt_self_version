@@ -22,13 +22,16 @@ class DKT(Module):
         self.out_layer = Linear(self.hidden_size, self.num_c)
         
 
-    def forward(self, q, r):
+    def forward(self, q=None, r=None,if_strait_input=0,strait_input=None):
         # print(f"q.shape is {q.shape}")
         emb_type = self.emb_type
-        if emb_type == "qid":
-            x = q + self.num_c * r
-            xemb = self.interaction_emb(x)
-        # print(f"xemb.shape is {xemb.shape}")
+        if if_strait_input == 0:
+            if emb_type == "qid":
+                x = q + self.num_c * r
+                xemb = self.interaction_emb(x)
+            # print(f"xemb.shape is {xemb.shape}")
+        else:
+            xemb = strait_input
         h, _ = self.lstm_layer(xemb)
         print(f"lstm.shape is {h.shape}")
         

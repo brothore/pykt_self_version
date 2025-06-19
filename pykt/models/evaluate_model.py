@@ -638,7 +638,7 @@ def evaluate_question(model, test_loader, model_name, fusion_type=["early_fusion
                 y = model(dcurori)#c.long(), r.long(), q.long())
                 y = (y * one_hot(cshft.long(), model.num_c)).sum(-1)
             elif model_name in ["dkt", "dkt+","LSTM_Template","CTNKT"]:
-                y = model(c.long(), r.long())
+                y,_ = model(c.long(), r.long())
                 y = (y * one_hot(cshft.long(), model.num_c)).sum(-1)
                 #全1
                 # shape = (cshft.size(0), cshft.size(1))

@@ -5,9 +5,10 @@ qikt_ab_models = ["qikt_ab_a+b+c","qikt_ab_a+b+c+irt","qikt_ab_a+b+irt","qikt_ab
 que_type_models += qikt_ab_models
 
 PRINT_DATA_PROCESS = 1
-
-SET_TARGET_STU = 0
-#pk ph pt 1 2 3 4-13
+freeze_epoch = 1
+SMOTE_METHOD = 'opt'
+SET_TARGET_STU = 1003
+#pk ph pt 1 2 3 4-13 1001 1002 1003 level1 level2 level3
 #三个学生
 FOCAL_LOSS = 0
 ERR_PATH = 1

@@ -24,6 +24,7 @@ def save_config(train_config, model_config, data_config, params, save_dir):
         json.dump(d, fout)
 
 def main(params):
+    other_name = params["other_name"]
     if "use_wandb" not in params:
         params['use_wandb'] = 1
 
@@ -51,7 +52,7 @@ def main(params):
         if model_name in ["dtransformer"]:
             train_config["batch_size"] = 32 ## because of OOM
         model_config = copy.deepcopy(params)
-        for key in ["model_name", "dataset_name", "emb_type", "save_dir", "fold", "seed","predict_after_train"]:
+        for key in ["model_name", "dataset_name", "emb_type", "save_dir", "fold", "seed","predict_after_train","other_name","batch_size"]:
             del model_config[key]
         if 'batch_size' in params:
             train_config["batch_size"] = params['batch_size']
@@ -72,7 +73,7 @@ def main(params):
     debug_print(text="init_dataset",fuc_name="main")
     if model_name not in ["dimkt"]:
         if MULTI_LEVEL_TRAIN == 1:
-            train_loader, valid_loader, *_,level1_loader,level3_loader = init_dataset4train_multi(dataset_name, model_name, data_config, fold, batch_size)
+            train_loader, valid_loader, *_,level1_loader,level2_loader,level3_loader = init_dataset4train_multi(dataset_name, model_name, data_config, fold, batch_size)
         else:
             
             train_loader, valid_loader, *_ = init_dataset4train(dataset_name, model_name, data_config, fold, batch_size)
@@ -148,7 +149,7 @@ def main(params):
         if MULTI_LEVEL_TRAIN == 1:
             # print(f"======================={level3_loader is not None},{level1_loader is not None}")
             testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch = \
-                train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, None, None, save_model, data_config[dataset_name], fold,level1_loader=level1_loader,level3_loader=level3_loader) 
+                train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, None, None, save_model, data_config[dataset_name], fold,level1_loader=level1_loader,level2_loader=level2_loader,level3_loader=level3_loader) 
         else:    
             testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch = \
                 train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, None, None, save_model, data_config[dataset_name], fold)
@@ -166,7 +167,7 @@ def main(params):
         else:
             if MULTI_LEVEL_TRAIN == 1:
                 testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch = \
-                train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, None, None, save_model, fold,level1_loader=level1_loader,level3_loader=level3_loader,emb_sizess=emb_size) 
+                train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, None, None, save_model, fold,level1_loader=level1_loader,level2_loader=level2_loader,level3_loader=level3_loader,emb_sizess=emb_size) 
             else:
                 testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch = train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, None, None, save_model,emb_sizess=emb_size)
             
@@ -181,7 +182,7 @@ def main(params):
 
     print("fold\tmodelname\tembtype\ttestauc\ttestacc\twindow_testauc\twindow_testacc\tvalidauc\tvalidacc\tbest_epoch")
     print(str(fold) + "\t" + model_name + "\t" + emb_type + "\t" + str(round(testauc, 4)) + "\t" + str(round(testacc, 4)) + "\t" + str(round(window_testauc, 4)) + "\t" + str(round(window_testacc, 4)) + "\t" + str(validauc) + "\t" + str(validacc) + "\t" + str(best_epoch))
-    model_save_path = os.path.join(ckpt_path, emb_type+"_model.ckpt")
+    model_save_path = os.path.join(ckpt_path, emb_type+other_name+"_model.ckpt")
     print(f"end:{datetime.datetime.now()}")
     
     if params['use_wandb']==1:
