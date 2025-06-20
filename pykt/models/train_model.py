@@ -36,6 +36,234 @@ from itertools import zip_longest
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ii = 0
 TCN_ABQR = 0
+
+def fast_embedding_smote(minority_embeddings, minority_labels, minority_cshfts,
+                        target_count, random_state=42, 
+                        # 简化的参数设置
+                        k_neighbors=None, 
+                        alpha_range=(0.2, 0.8),
+                        noise_factor=0.1,
+                        use_standardization=False,  # 可选的标准化
+                        batch_size=1000):  # 批量处理
+    """
+    优化速度的SMOTE实现
+    """
+    np.random.seed(random_state)
+    
+    n_samples, n_features = minority_embeddings.shape
+    n_synthetic = target_count - n_samples
+    
+    print(f"数据维度: {n_features}, 样本数: {n_samples}")
+    print(f"需要生成: {n_synthetic} 个合成样本")
+    
+    if n_synthetic <= 0:
+        return minority_embeddings, minority_labels, minority_cshfts
+    
+    # 1. 简化的参数设置（避免复杂计算）
+    if k_neighbors is None:
+        k_neighbors = min(10, n_samples // 3) if n_features > 100 else min(5, n_samples // 4)
+    
+    print(f"使用邻居数: {k_neighbors}")
+    
+    # 2. 可选的标准化（仅在必要时使用）
+    if use_standardization:
+        scaler = StandardScaler()
+        normalized_embeddings = scaler.fit_transform(minority_embeddings)
+    else:
+        normalized_embeddings = minority_embeddings
+        scaler = None
+    
+    # 3. 构建邻居模型（一次性）
+    nbrs = NearestNeighbors(n_neighbors=k_neighbors + 1, algorithm='ball_tree')
+    nbrs.fit(normalized_embeddings)
+    
+    # 4. 批量生成合成样本
+    synthetic_embeddings = []
+    synthetic_labels = []
+    synthetic_cshfts = []
+    
+    # 预先生成所有随机数（避免循环中重复调用random）
+    seed_indices = np.random.randint(0, n_samples, size=n_synthetic)
+    alphas = np.random.uniform(alpha_range[0], alpha_range[1], size=n_synthetic)
+    
+    # 计算特征标准差（仅一次）
+    if noise_factor > 0:
+        feature_std = np.std(normalized_embeddings, axis=0)
+    
+    print("开始批量生成合成样本...")
+    start_time = time.time()
+    
+    # 分批处理避免内存过载
+    for batch_start in range(0, n_synthetic, batch_size):
+        batch_end = min(batch_start + batch_size, n_synthetic)
+        batch_size_actual = batch_end - batch_start
+        
+        batch_synthetic_embeddings = []
+        batch_synthetic_labels = []
+        batch_synthetic_cshfts = []
+        
+        for i in range(batch_start, batch_end):
+            idx_in_batch = i - batch_start
+            
+            # 使用预生成的随机数
+            seed_idx = seed_indices[i]
+            alpha = alphas[i]
+            
+            seed_embedding = normalized_embeddings[seed_idx]
+            
+            # 找到邻居（只计算一次）
+            distances, indices = nbrs.kneighbors([seed_embedding])
+            neighbor_indices = indices[0][1:]  # 排除自己
+            
+            # 简化的邻居选择（避免复杂排序）
+            if len(neighbor_indices) > 3:
+                # 随机选择中等距离的邻居
+                mid_start = len(neighbor_indices) // 4
+                mid_end = 3 * len(neighbor_indices) // 4
+                selected_neighbor = np.random.choice(neighbor_indices[mid_start:mid_end])
+            else:
+                selected_neighbor = np.random.choice(neighbor_indices)
+            
+            neighbor_embedding = normalized_embeddings[selected_neighbor]
+            
+            # 基础插值
+            synthetic_embedding = seed_embedding + alpha * (neighbor_embedding - seed_embedding)
+            
+            # 简化的噪声添加
+            if noise_factor > 0:
+                # 使用向量化操作添加噪声
+                noise = np.random.normal(0, noise_factor * feature_std)
+                synthetic_embedding += noise
+            
+            batch_synthetic_embeddings.append(synthetic_embedding)
+            batch_synthetic_labels.append(minority_labels[seed_idx])
+            batch_synthetic_cshfts.append(minority_cshfts[seed_idx])
+        
+        synthetic_embeddings.extend(batch_synthetic_embeddings)
+        synthetic_labels.extend(batch_synthetic_labels)
+        synthetic_cshfts.extend(batch_synthetic_cshfts)
+        
+        if batch_end % 1000 == 0 or batch_end == n_synthetic:
+            print(f"已完成 {batch_end}/{n_synthetic} 个样本")
+    
+    # 转换为numpy数组
+    synthetic_embeddings = np.array(synthetic_embeddings)
+    synthetic_labels = np.array(synthetic_labels)
+    synthetic_cshfts = np.array(synthetic_cshfts)
+    
+    # 反标准化（如果使用了标准化）
+    if scaler is not None:
+        synthetic_embeddings = scaler.inverse_transform(synthetic_embeddings)
+    
+    # 合并数据
+    augmented_embeddings = np.vstack([minority_embeddings, synthetic_embeddings])
+    augmented_labels = np.hstack([minority_labels, synthetic_labels])
+    augmented_cshfts = np.hstack([minority_cshfts, synthetic_cshfts])
+    
+    end_time = time.time()
+    print(f"生成完成! 耗时: {end_time - start_time:.2f} 秒")
+    print(f"生成合成样本: {len(synthetic_embeddings)}")
+    
+    return augmented_embeddings, augmented_labels, augmented_cshfts
+
+
+def ultra_fast_embedding_smote(minority_embeddings, minority_labels, minority_cshfts,
+                              target_count, random_state=42,
+                              k_neighbors=5, alpha_range=(0.3, 0.7)):
+    """
+    极速版本SMOTE - 最小化计算开销
+    """
+    np.random.seed(random_state)
+    
+    n_samples = len(minority_embeddings)
+    n_synthetic = target_count - n_samples
+    
+    if n_synthetic <= 0:
+        return minority_embeddings, minority_labels, minority_cshfts
+    
+    print(f"极速模式: 生成 {n_synthetic} 个样本")
+    start_time = time.time()
+    
+    # 构建最近邻（使用更快的算法）
+    k_neighbors = min(k_neighbors, n_samples - 1)
+    nbrs = NearestNeighbors(n_neighbors=k_neighbors + 1, algorithm='kd_tree', n_jobs=-1)
+    nbrs.fit(minority_embeddings)
+    
+    # 向量化生成所有随机数
+    seed_indices = np.random.randint(0, n_samples, size=n_synthetic)
+    alphas = np.random.uniform(alpha_range[0], alpha_range[1], size=n_synthetic)
+    
+    synthetic_embeddings = []
+    synthetic_labels = []
+    synthetic_cshfts = []
+    
+    # 预计算所有种子样本的邻居
+    all_neighbors = {}
+    unique_seeds = np.unique(seed_indices)
+    
+    for seed_idx in unique_seeds:
+        _, indices = nbrs.kneighbors([minority_embeddings[seed_idx]])
+        all_neighbors[seed_idx] = indices[0][1:]  # 排除自己
+    
+    # 快速生成
+    for i in range(n_synthetic):
+        print(f"正在生成{i}")
+        seed_idx = seed_indices[i]
+        alpha = alphas[i]
+        
+        # 从预计算的邻居中随机选择
+        neighbor_idx = np.random.choice(all_neighbors[seed_idx])
+        
+        # 线性插值
+        seed_emb = minority_embeddings[seed_idx]
+        neighbor_emb = minority_embeddings[neighbor_idx]
+        synthetic_emb = seed_emb + alpha * (neighbor_emb - seed_emb)
+        
+        synthetic_embeddings.append(synthetic_emb)
+        synthetic_labels.append(minority_labels[seed_idx])
+        synthetic_cshfts.append(minority_cshfts[seed_idx])
+        
+        if (i + 1) % 5000 == 0:
+            print(f"已生成 {i + 1}/{n_synthetic}")
+    
+    # 合并数据
+    augmented_embeddings = np.vstack([minority_embeddings, np.array(synthetic_embeddings)])
+    augmented_labels = np.hstack([minority_labels, np.array(synthetic_labels)])
+    augmented_cshfts = np.hstack([minority_cshfts, np.array(synthetic_cshfts)])
+    
+    end_time = time.time()
+    print(f"极速生成完成! 耗时: {end_time - start_time:.2f} 秒")
+    if len(synthetic_embeddings) > 0:
+        print("\n" + "="*50)
+        print("开始评估合成数据质量...")
+        print("="*50)
+        
+        try:
+            # 创建评估器
+            evaluator = SMOTEEvaluator(
+                X_original=minority_embeddings,
+                y_original=minority_labels, 
+                X_synthetic=synthetic_embeddings,
+                y_synthetic=synthetic_labels
+            )
+            
+            # 进行综合评估
+            evaluation_results = evaluator.comprehensive_evaluation()
+            
+            # 可视化比较（可选）
+            # evaluator.visualize_comparison(method='tsne')
+            
+            print("="*50)
+            print("合成数据质量评估完成！")
+            print("="*50)
+            
+           
+            
+        except Exception as e:
+            print(f"质量评估失败: {e}")
+            
+    
+    return augmented_embeddings, augmented_labels, augmented_cshfts
 def optimized_embedding_smote(minority_embeddings, minority_labels, minority_cshfts,
                                target_count, random_state=42):
     """
@@ -83,6 +311,7 @@ def optimized_embedding_smote(minority_embeddings, minority_labels, minority_csh
     synthetic_cshfts = []
     
     for i in range(n_synthetic):
+        print(f"正在生成样本{i}")
         # 随机选择种子样本
         seed_idx = np.random.randint(0, n_samples)
         seed_embedding = normalized_embeddings[seed_idx]
@@ -493,6 +722,32 @@ def create_robust_oversampled_dataloader(embeddings1, labels1, cshft1,
         augmented_embeddings3, augmented_labels3, augmented_cshfts3 = optimized_embedding_smote(
             embeddings3, labels3, cshft3, target_count
         )    
+    elif method == 'ultra_fast':
+        # 改进方法
+        print("对Level1进行极速过采样...")
+        augmented_embeddings1, augmented_labels1, augmented_cshfts1 = ultra_fast_embedding_smote(
+            embeddings1, labels1, cshft1, target_count, random_state=random_state
+        )
+        
+        print("对Level3进行极速过采样...")
+        augmented_embeddings3, augmented_labels3, augmented_cshfts3 = ultra_fast_embedding_smote(
+            embeddings3, labels3, cshft3, target_count, random_state=random_state + 1
+        )  
+    elif method == 'fast':
+        # 改进方法
+        print("对Level1进行快速过采样...")
+        augmented_embeddings1, augmented_labels1, augmented_cshfts1 = fast_embedding_smote(
+            embeddings1, labels1, cshft1, target_count, 
+            k_neighbors=k_neighbors, random_state=random_state, 
+            use_standardization=False  # 关闭标准化以提高速度
+        )
+        
+        print("对Level3进行快速过采样...")
+        augmented_embeddings3, augmented_labels3, augmented_cshfts3 = fast_embedding_smote(
+            embeddings3, labels3, cshft3, target_count,
+            k_neighbors=k_neighbors, random_state=random_state + 1,
+            use_standardization=False
+        )
     elif method == 'borderline':
         # 边界SMOTE方法
         print("对Level1进行边界过采样...")

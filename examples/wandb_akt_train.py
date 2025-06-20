@@ -21,7 +21,8 @@ if __name__ == "__main__":
     parser.add_argument("--use_wandb", type=int, default=1)
     parser.add_argument("--add_uuid", type=int, default=1)
     # 新增的kernel_size参数
-    parser.add_argument("--kernel_sizes", type=str, default="[3,5,7,9]", help="卷积核尺寸列表，例如 '[3,5,7,9]'")
+    # parser.add_argument("--kernel_sizes", type=str, default="[3,5,7,9]", help="卷积核尺寸列表，例如 '[3,5,7,9]'")
+    parser.add_argument("--other_name", type=str, default="origin")
     parser.add_argument("--predict_after_train", type=int, default=0)
     
     args = parser.parse_args()

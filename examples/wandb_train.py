@@ -1,7 +1,7 @@
 import os
 import argparse
 import json
-
+from wandb_z_predict import main as predict_main
 import torch
 torch.set_num_threads(4) 
 from torch.optim import SGD, Adam
@@ -53,7 +53,7 @@ def main(params):
             train_config["batch_size"] = 32 ## because of OOM
         model_config = copy.deepcopy(params)
         for key in ["model_name", "dataset_name", "emb_type", "save_dir", "fold", "seed","predict_after_train","other_name","batch_size"]:
-            del model_config[key]
+            model_config.pop(key, None)  # 安全删除存在的键
         if 'batch_size' in params:
             train_config["batch_size"] = params['batch_size']
         if 'num_epochs' in params:
@@ -191,7 +191,7 @@ def main(params):
 
     if params['predict_after_train'] == 1:
         # 导入目标脚本的main函数
-        from wandb_predict import main as predict_main
+        
         
         # 构造参数字典（可根据需要从params中获取或使用固定值）
         predict_params = {
