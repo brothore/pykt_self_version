@@ -319,7 +319,11 @@ def calculate_diversity_metric(auc_values, method='normalized_cv'):
         # 将结果映射到0-1范围，值越接近1表示差异越大
         # 理论上normalized_std可能超过1，所以使用tanh函数进行soft限制
         return np.tanh(normalized_std)
+    elif method == 'std':
+        
+        std_val = np.std(auc_array)
     
+        return std_val
     elif method == 'normalized_variance':
         # 标准化方差方法：variance/(max-min)^2
         max_val = np.max(auc_array)
@@ -674,7 +678,7 @@ if __name__ == "__main__":
     parser.add_argument("--target_value", type=float, default=0.8, help="目标AUC值")
     parser.add_argument("--diversity_weight", type=float, default=0.5, help="差异指标权重")
     parser.add_argument("--performance_weight", type=float, default=0.5, help="性能指标权重")
-    parser.add_argument("--diversity_method", type=str, default="normalized_variance", 
+    parser.add_argument("--diversity_method", type=str, default="std",
                       choices=["normalized_cv", "normalized_range", "normalized_std", "normalized_variance", "entropy_based"],
                       help="差异指标计算方法")
     parser.add_argument("--performance_method", type=str, default="relative_absolute_diff",

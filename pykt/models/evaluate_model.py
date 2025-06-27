@@ -278,7 +278,7 @@ def evaluate(model, test_loader, model_name, rel=None, save_path="", save_io_pat
         acc = metrics.accuracy_score(ts, prelabels)
     
     # === 修改：确保正确的CSV格式保存 ===
-    if save_io_path and SAVE_RESULT:
+    if save_io_path != None and SAVE_RESULT:
         import pandas as pd
         import csv
         
@@ -319,36 +319,36 @@ def evaluate(model, test_loader, model_name, rel=None, save_path="", save_io_pat
                 ])
         
         # 手动写入CSV文件，确保格式正确
-        with open(save_io_path, 'w', newline='', encoding='utf-8-sig') as csvfile:
-            writer = csv.writer(csvfile, quoting=csv.QUOTE_MINIMAL)
+        # with open(save_io_path, 'w', newline='', encoding='utf-8-sig') as csvfile:
+        #     writer = csv.writer(csvfile, quoting=csv.QUOTE_MINIMAL)
             
-            # 写入表头
-            writer.writerow(column_names)
+        #     # 写入表头
+        #     writer.writerow(column_names)
             
-            # 写入数据行
-            for data in all_inputs:
-                row = []
-                for col_name in column_names:
-                    if col_name in data:
-                        value = data[col_name]
-                        # 对于包含逗号的字符串数据，需要特殊处理
-                        if isinstance(value, (list, tuple)):
-                            # 将列表转换为用分号分隔的字符串，避免逗号干扰
-                            row.append(';'.join(map(str, value)))
-                        elif isinstance(value, str) and '[' in value:
-                            # 如果是字符串化的列表，用引号包围
-                            row.append(f'"{value}"')
-                        else:
-                            row.append(value)
-                    else:
-                        row.append('')  # 空值
-                writer.writerow(row)
+        #     # 写入数据行
+        #     for data in all_inputs:
+        #         row = []
+        #         for col_name in column_names:
+        #             if col_name in data:
+        #                 value = data[col_name]
+        #                 # 对于包含逗号的字符串数据，需要特殊处理
+        #                 if isinstance(value, (list, tuple)):
+        #                     # 将列表转换为用分号分隔的字符串，避免逗号干扰
+        #                     row.append(';'.join(map(str, value)))
+        #                 elif isinstance(value, str) and '[' in value:
+        #                     # 如果是字符串化的列表，用引号包围
+        #                     row.append(f'"{value}"')
+        #                 else:
+        #                     row.append(value)
+        #             else:
+        #                 row.append('')  # 空值
+        #         writer.writerow(row)
         
-        print(f"保存了 {len(all_inputs)} 个序列的待预测位置数据到 {save_io_path}")
-        print(f"预测正确的数量：{sum(1 for x in all_inputs if x['is_correct'])}")
-        print(f"预测准确率：{sum(x['is_correct'] for x in all_inputs) / len(all_inputs):.4f}")
-        print(f"CSV文件列名：{column_names}")
-        print("注意：序列数据使用分号(;)分隔以避免逗号冲突")
+        # print(f"保存了 {len(all_inputs)} 个序列的待预测位置数据到 {save_io_path}")
+        # print(f"预测正确的数量：{sum(1 for x in all_inputs if x['is_correct'])}")
+        # print(f"预测准确率：{sum(x['is_correct'] for x in all_inputs) / len(all_inputs):.4f}")
+        # print(f"CSV文件列名：{column_names}")
+        # print("注意：序列数据使用分号(;)分隔以避免逗号冲突")
     
     return auc, acc
 def early_fusion(curhs, model, model_name):

@@ -16,10 +16,10 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--learning_rate", type=float, default=1e-3)
 
-    parser.add_argument("--use_wandb", type=int, default=1)
+    parser.add_argument("--use_wandb", type=int, default=0)
     parser.add_argument("--add_uuid", type=int, default=1)
     parser.add_argument("--predict_after_train", type=int, default=0)
-    parser.add_argument("--other_name", type=str, default="freeze10")
+    parser.add_argument("--other_name", type=str, default="freeze10000")
     
     args = parser.parse_args()
 

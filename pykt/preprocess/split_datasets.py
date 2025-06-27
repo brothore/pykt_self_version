@@ -4,7 +4,6 @@ import pandas as pd
 import numpy as np
 import json
 import copy
-import torch
 
 ALL_KEYS = ["fold", "uid", "questions", "concepts", "responses", "timestamps",
             "usetimes", "selectmasks", "is_repeat", "qidxs", "rest", "orirow", "cidxs"]
@@ -605,44 +604,6 @@ def main(dname, fname, dataset_name, configf, min_seq_len=3, maxlen=200, kfold=5
     print(
         f"after extend multi, total interactions: {extends}, qs: {qs}, cs: {cs}, seqnum: {seqnum}")
 
-    
-    #========================ABQR=====================
-    #  # 构建问题到概念的二值矩阵
-    # Q = build_question_to_concepts_mapping_matrix(total_df, dkeyid2idx)
-
-    # # 生成邻接矩阵
-    # adjacency_matrix = generate_adjacency_matrix(Q)
-
-    # # 保存邻接矩阵为 .pt 文件
-    # torch.save(adjacency_matrix, os.path.join(dname, "adjacency_matrix.pt"))
-    # print(f"邻接矩阵已保存至 {os.path.join(dname, 'adjacency_matrix.pt')}")
-    
-    # # 假设 Q 是 build_question_to_concepts_mapping_matrix 函数生成的二值矩阵
-    # Q = build_question_to_concepts_mapping_matrix(total_df, dkeyid2idx)
-
-    # # 生成邻接矩阵
-    # adjacency_matrix = generate_adjacency_matrix(Q)
-
-    # # 保存邻接矩阵为 .pt 文件
-    # adjacency_matrix = adjacency_matrix.to_dense()
-    # # print(f"adjacency_matrix{adjacency_matrix[0,:]}")
-    # torch.save(adjacency_matrix, os.path.join(dname, "adjacency_matrix.pt"))
-    # print(f"邻接矩阵已保存至 {os.path.join(dname, 'adjacency_matrix.pt')}")
-
-    # # 转换二值矩阵为 Pandas DataFrame 并保存为 CSV
-    # binary_matrix_df = pd.DataFrame(Q.numpy())  # 假设 Q 是 torch.Tensor
-    # binary_matrix_csv_path = os.path.join(dname, "binary_matrix.csv")
-    # binary_matrix_df.to_csv(binary_matrix_csv_path, index=False)
-    # print(f"二值矩阵已保存至 {binary_matrix_csv_path}")
-
-    # # 转换邻接矩阵为 Pandas DataFrame 并保存为 CSV
-    # adjacency_matrix_dense = adjacency_matrix  # 如果是稀疏矩阵，转换为密集矩阵
-    # adjacency_matrix_df = pd.DataFrame(adjacency_matrix_dense.numpy())  # 转为 NumPy 数组
-    # adjacency_matrix_csv_path = os.path.join(dname, "adjacency_matrix.csv")
-    # adjacency_matrix_df.to_csv(adjacency_matrix_csv_path, index=False)
-    # print(f"邻接矩阵已保存至 {adjacency_matrix_csv_path}")
-    #================================================
-    
     save_id2idx(dkeyid2idx, os.path.join(dname, "keyid2idx.json"))
     effective_keys.add("fold")
     config = []
@@ -721,61 +682,3 @@ def main(dname, fname, dataset_name, configf, min_seq_len=3, maxlen=200, kfold=5
 
     print("="*20)
     print("\n".join(stares))
-    
-
-    
-def build_question_to_concepts_mapping_matrix(df, dkeyid2idx):
-    """
-    构建每个问题对应的概念二值矩阵。
-
-    Args:
-        df (pd.DataFrame): 处理后的数据集。
-        dkeyid2idx (dict): 包含问题和概念的ID到索引的映射。
-
-    Returns:
-        torch.Tensor: 形状为 (num_q, num_c) 的二值矩阵，
-                      表示问题与概念的关联关系。
-    """
-    num_q = len(dkeyid2idx['questions'])
-    num_c = len(dkeyid2idx['concepts'])
-    
-    # 初始化一个全零的矩阵
-    Q = torch.zeros((num_q, num_c), dtype=torch.float32)
-    
-    for _, row in df.iterrows():
-        question_ids = row['questions'].split(',')
-        concept_ids = row['concepts'].split(',')
-        # print(f"question_ids{question_ids};concept_ids{concept_ids}")
-        # 将字符串索引转换为整数，并过滤无效的索引
-        question_indices = [int(q) for q in question_ids if q.isdigit()]
-        concept_indices = [int(c) for c in concept_ids if c.isdigit()]
-        #================在这里添加代码===============
-        for q in question_indices:
-            for c in concept_indices:
-                Q[q, c] = 1.0  # 将矩阵 Q 中的对应位置 [q, c] 设置为 1
-        
-
-        #============================================
-
-    
-    return Q
-def generate_adjacency_matrix(Q):
-    """
-    生成问题之间共享概念的邻接矩阵。
-
-    Args:
-        Q (torch.Tensor): 形状为 (num_q, num_c) 的二值矩阵，
-                          表示问题与概念的关联关系。
-
-    Returns:
-        torch.Tensor: 形状为 (num_q, num_q) 的邻接矩阵，
-                      若问题 i 和 j 共享至少一个概念，则 adjacency[i][j] = 1.0，否则为 0.0。
-    """
-    # 计算共享概念的数量矩阵
-    shared_concepts = torch.matmul(Q, Q.t())
-    
-    # 应用阈值，将共享数量 >= 1 的位置标记为 1.0，否则为 0.0
-    adjacency = (shared_concepts >= 1).float()
-    
-    return adjacency 
-    

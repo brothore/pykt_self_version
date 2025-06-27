@@ -10,6 +10,7 @@ dist/
 *.egg-info/
 *.pyc
 *.pkl
+data/
 saved_model
 build/
 .vscode/

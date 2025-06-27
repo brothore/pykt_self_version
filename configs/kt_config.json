@@ -72,6 +72,13 @@
         "dropout":0.05,
         "d_ff":256
     },
+    "BERT": {
+        "learning_rate": 1e-5,
+        "d_model":256,
+        "n_blocks":1,
+        "dropout":0.05,
+        "d_ff":256
+    },
     "kqn": {
         "learning_rate": 1e-3,
         "n_hidden": 128,
