@@ -232,26 +232,14 @@ def main(params):
     print(f"开始批量评估，共 {total_students} 个学生，从学生 {start_student} 开始")
     
     for student_id in range(start_student, total_students + 1):
-        try:
-            # 评估单个学生
-            result = evaluate_single_student(params, student_id)
-            all_results.append(result)
+
+        # 评估单个学生
+        result = evaluate_single_student(params, student_id)
+        all_results.append(result)
+        
+        print(f"完成学生 {student_id} 的评估 ({student_id - start_student + 1}/{total_students - start_student + 1})")
             
-            print(f"完成学生 {student_id} 的评估 ({student_id - start_student + 1}/{total_students - start_student + 1})")
-            
-        except Exception as e:
-            print(f"评估学生 {student_id} 时出错: {e}")
-            # 创建一个错误记录
-            error_result = {
-                "student_id": student_id,
-                "error": str(e),
-                "testauc": -1,
-                "testacc": -1,
-                "window_testauc": -1,
-                "window_testacc": -1
-            }
-            all_results.append(error_result)
-            continue
+
     
     # 将所有结果转换为DataFrame并保存为CSV
     if all_results:
@@ -314,7 +302,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--bz", type=int, default=256)
     parser.add_argument("--save_dir", type=str, default="saved_model")
-    parser.add_argument("--fusion_type", type=str, default="early_fusion,late_fusion")
+    parser.add_argument("--fusion_type", type=str, default="late_fusion")
     parser.add_argument("--use_wandb", type=int, default=0)
     parser.add_argument("--total_students", type=int, default=770, help="总学生数量")
     parser.add_argument("--start_student", type=int, default=1, help="开始评估的学生ID")

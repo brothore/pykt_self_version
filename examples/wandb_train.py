@@ -197,7 +197,8 @@ def main(params):
         predict_params = {
             'save_dir': ckpt_path,  # 模型保存目录
             'bz': 256,  # 模型保存目录
-            'use_wandb': 0  # 是否使用wandb
+            'use_wandb': 0,  # 是否使用wandb
+            'fusion_type': "late_fusion"  # 是否使用wandb
         }
         
         # 调用目标脚本的main函数并传入参数

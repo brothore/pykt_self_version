@@ -16,7 +16,7 @@ class Dim(IntEnum):
 
 class ATAKT(nn.Module):
     def __init__(self, n_question, n_pid, d_model, n_blocks, dropout, d_ff=256, 
-            kq_same=1, final_fc_dim=512, num_attn_heads=8, separate_qa=False, l2=1e-5, emb_type="qid", emb_path="", pretrain_dim=768):
+            kq_same=1, final_fc_dim=512, num_attn_heads=8, separate_qa=False, l2=1e-5, emb_type="qid", emb_path="", pretrain_dim=768, epsilon=10, beta=0.2):
         super().__init__()
         """
         Input:
@@ -26,7 +26,9 @@ class ATAKT(nn.Module):
             d_ff : dimension for fully conntected net inside the basic block
             kq_same: if key query same, kq_same=1, else = 0
         """
-        self.model_name = "Transformer_Template"
+        self.epsilon = epsilon
+        self.beta = beta
+        self.model_name = "atakt"
         self.n_question = n_question
         self.dropout = dropout
         self.kq_same = kq_same
@@ -135,7 +137,7 @@ class Architecture(nn.Module):
         self.d_model = d_model
         self.model_type = model_type
 
-        if model_type in {'Transformer_Template'}:
+        if model_type in {'atakt'}:
             self.blocks_1 = nn.ModuleList([
                 TransformerLayer(d_model=d_model, d_feature=d_model // n_heads,
                                  d_ff=d_ff, dropout=dropout, n_heads=n_heads, kq_same=kq_same, emb_type=emb_type)

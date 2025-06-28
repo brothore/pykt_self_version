@@ -160,7 +160,7 @@ def evaluate(model, test_loader, model_name, rel=None, save_path="", save_io_pat
                 y = model(cq.long(), cc.long(), r.long())
                 y = y[:, 1:]
             elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt"]:                                
-                y, reg_loss = model(cc.long(), cr.long(), cq.long())
+                y, reg_loss,_ = model(cc.long(), cr.long(), cq.long())
                 y = y[:,1:]
             elif model_name in ["dtransformer"]:
                 output, *_ = model.predict(cc.long(), cr.long(), cq.long())
@@ -613,7 +613,7 @@ def evaluate_question(model, test_loader, model_name, fusion_type=["early_fusion
             elif model_name in ["rekt"]:
                 y, h = model(dcurori, qtest=True, train=False)
             elif model_name in ["Transformer_Template","akt","extrakt", "folibikt","akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt"]:
-                y, reg_loss, h = model(cc.long(), cr.long(), cq.long(), True)
+                y, reg_loss, h,_ = model(cc.long(), cr.long(), cq.long(), True)
                 y = y[:,1:]
             elif model_name in ["dtransformer"]:
                 output, h, *_ = model.predict(cc.long(), cr.long(), cq.long())
@@ -1533,7 +1533,7 @@ def predict_each_group2(dtotal, dcur, dforget, curdforget, is_repeat, qidx, uid,
             y = model(ccq.long(), ccc.long(), curr.long())
             y = y[:, 1:]
         elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "cakt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt"]:                                
-            y, reg_loss = model(ccc.long(), ccr.long(), ccq.long())
+            y, reg_loss,_ = model(ccc.long(), ccr.long(), ccq.long())
             y = y[:,1:]
         elif model_name in ["dtransformer"]:
             y,  *_  = model.predict(ccc.long(), ccr.long(), ccq.long(),True,1)

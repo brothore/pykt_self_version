@@ -588,10 +588,27 @@ def model_forward(model, data, writer: PredictionWriter,opt=None, rel=None,model
     elif model_name in ["saint"]:
         y = model(cq.long(), cc.long(), r.long())
         ys.append(y[:, 1:])
-    elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt"]:               
+    elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT"]:               
         y, reg_loss = model(cc.long(), cr.long(), cq.long())
         ys.append(y[:,1:])
         preloss.append(reg_loss)
+
+    elif model_name in ["atakt"]: 
+
+        y, reg_loss, features = model(cc.long(), cr.long(), cq.long())
+        y = y[:,1:]
+        preloss.append(reg_loss)
+        loss = cal_loss(model, [y], r, rshft, sm,preloss=preloss)
+        # at
+        features_grad = grad(loss, features, retain_graph=True)
+        p_adv = torch.FloatTensor(model.epsilon * _l2_normalize_adv(features_grad[0].data))
+        p_adv = Variable(p_adv).to(device)
+        pred_res, reg_loss2, _ = model(cc.long(), cr.long(), cq.long(), perturbation=p_adv)
+        # second loss
+        pred_res = pred_res[:,1:]
+        preloss.append(reg_loss2)
+        adv_loss = cal_loss(model, [pred_res], r, rshft, sm,preloss=preloss)
+        loss = loss + model.beta * adv_loss
     elif model_name in ["atkt", "atktfix"]:
         y, features = model(c.long(), r.long())
         y = (y * one_hot(cshft.long(), model.num_c)).sum(-1)
@@ -625,7 +642,7 @@ def model_forward(model, data, writer: PredictionWriter,opt=None, rel=None,model
         y = model(q.long(),c.long(),sd.long(),qd.long(),r.long(),qshft.long(),cshft.long(),sdshft.long(),qdshft.long())
         ys.append(y) 
 
-    if model_name not in ["atkt", "atktfix"]+que_type_models or model_name in ["lpkt", "rkt"]:
+    if model_name not in ["atkt", "atktfix","atakt"]+que_type_models or model_name in ["lpkt", "rkt"]:
         loss = cal_loss(model, ys, r, rshft, sm, preloss)
     return loss
     
