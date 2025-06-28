@@ -84,7 +84,9 @@ class ATAKT(nn.Module):
         # Batch First
         if emb_type.startswith("qid"):
             q_embed_data, qa_embed_data = self.base_emb(q_data, target)
-        
+        pert = q_embed_data
+        if perturbation is not None:
+            q_embed_data += perturbation
         pid_embed_data = None
         if self.n_pid > 0: # have problem id
             q_embed_diff_data = self.q_embed_diff(q_data)  # d_ct 总结了包含当前question（concept）的problems（questions）的变化
@@ -103,15 +105,14 @@ class ATAKT(nn.Module):
             c_reg_loss = (pid_embed_data ** 2.).sum() * self.l2 # rasch部分loss
         else:
             c_reg_loss = 0.
-        pert = q_embed_data
+        
         # BS.seqlen,d_model
         # Pass to the decoder
         # output shape BS,seqlen,d_model or d_model//2
 
 
 
-        if perturbation is not None:
-            q_embed_data += perturbation
+        
         d_output = self.model(q_embed_data, qa_embed_data, pid_embed_data)
 
         concat_q = torch.cat([d_output, q_embed_data], dim=-1)
