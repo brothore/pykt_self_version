@@ -1665,10 +1665,10 @@ def cal_loss(model, ys, r, rshft, sm, preloss=[]):
     # 根据全局变量选择损失函数
     if FOCAL_LOSS:
         loss_fn = focal_loss
-        print("Using Focal Loss!")
+        # print("Using Focal Loss!")
     else:
         loss_fn = F.binary_cross_entropy
-        print("Using Binary Cross-Entropy Loss!")
+        # print("Using Binary Cross-Entropy Loss!")
 
     if model_name in ["atdkt", "simplekt", "stablekt", "bakt_time", "sparsekt"]:
         y = torch.masked_select(ys[0], sm)
@@ -1933,7 +1933,7 @@ def model_forward(model, data, opt=None, rel=None,model_config={},data_label=0):
         features_grad = grad(loss, features, retain_graph=True)
         p_adv = torch.FloatTensor(model.epsilon * _l2_normalize_adv(features_grad[0].data))
         p_adv = Variable(p_adv).to(device)
-        pred_res, _ = model(cc.long(), cr.long(), cq.long(), p_adv)
+        pred_res, _ = model(cc.long(), cr.long(), cq.long(), perturbation=p_adv)
         # second loss
         pred_res = pred_res[:,1:]
         adv_loss = cal_loss(model, [pred_res], r, rshft, sm)

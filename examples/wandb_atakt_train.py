@@ -19,9 +19,12 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate", type=float, default=1e-4)
     parser.add_argument("--epsilon", type=int, default=10)
     parser.add_argument("--beta", type=float, default=0.2)
+    # parser.add_argument("--epsilon2", type=int, default=10)
+    # parser.add_argument("--beta2", type=float, default=0.2)
     parser.add_argument("--use_wandb", type=int, default=0)
     parser.add_argument("--add_uuid", type=int, default=1)
-    parser.add_argument("--other_name", type=str, default="q_data_pert")
+    parser.add_argument("--other_name", type=str, default="pert")
+    parser.add_argument("--pert_type", type=str, default="qa")
     parser.add_argument("--predict_after_train", type=int, default="1")
 
     

@@ -325,10 +325,10 @@ def cal_loss(model, ys, r, rshft, sm, preloss=[]):
     # 根据全局变量选择损失函数
     if FOCAL_LOSS:
         loss_fn = focal_loss
-        print("Using Focal Loss!")
+        # print("Using Focal Loss!")
     else:
         loss_fn = F.binary_cross_entropy
-        print("Using Binary Cross-Entropy Loss!")
+        # print("Using Binary Cross-Entropy Loss!")
 
     if model_name in ["atdkt", "simplekt", "stablekt", "bakt_time", "sparsekt"]:
         y = torch.masked_select(ys[0], sm)
