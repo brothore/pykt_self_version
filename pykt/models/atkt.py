@@ -25,6 +25,8 @@ class ATKT(nn.Module):
         self.rnn = nn.LSTM(self.skill_dim+self.answer_dim, self.hidden_dim, batch_first=True)
         self.dropout_layer = nn.Dropout(dropout)
         self.fc = nn.Linear(self.hidden_dim*2, self.num_c)
+        if  self.emb_type == "no_attn":
+            self.fc1 = nn.Linear(self.hidden_dim, self.num_c)
         self.sig = nn.Sigmoid()
         
         self.skill_emb = nn.Embedding(self.num_c+1, self.skill_dim)
@@ -44,7 +46,8 @@ class ATKT(nn.Module):
         att_w = self.mlp(lstm_output)
         # print(f"att_w: {att_w.shape}")
         att_w = torch.tanh(att_w)
-        att_w = self.similarity(att_w)
+        att_w = self.similarity(att_w
+                                 )
         # print(f"att_w: {att_w.shape}")
 
         if self.fix == True:
@@ -78,13 +81,23 @@ class ATKT(nn.Module):
         
         skill_embedding=self.skill_emb(skill)
         answer_embedding=self.answer_emb(answer)
+        if self.emb_type == "qid":
+            skill_answer=torch.cat((skill_embedding,answer_embedding), 2)
+            answer_skill=torch.cat((answer_embedding,skill_embedding), 2)
+            
+            answer=answer.unsqueeze(2).expand_as(skill_answer)
         
-        skill_answer=torch.cat((skill_embedding,answer_embedding), 2)
-        answer_skill=torch.cat((answer_embedding,skill_embedding), 2)
+            skill_answer_embedding=torch.where(answer==1, skill_answer, answer_skill)
+        elif  self.emb_type == "qid_base_emb":
+            skill_answer_embedding = skill_answer=torch.cat((skill_embedding,answer_embedding), 2)
+        else:
+            skill_answer=torch.cat((skill_embedding,answer_embedding), 2)
+            answer_skill=torch.cat((answer_embedding,skill_embedding), 2)
+            
+            answer=answer.unsqueeze(2).expand_as(skill_answer)
         
-        answer=answer.unsqueeze(2).expand_as(skill_answer)
+            skill_answer_embedding=torch.where(answer==1, skill_answer, answer_skill)    
         
-        skill_answer_embedding=torch.where(answer==1, skill_answer, answer_skill)
         
         # print(skill_answer_embedding)
         
@@ -94,10 +107,12 @@ class ATKT(nn.Module):
             
         out,_ = self.rnn(skill_answer_embedding)
         # print(f"out: {out.shape}")
-        out=self.attention_module(out)
-        # print(f"after attn out: {out.shape}")
-        res = self.sig(self.fc(self.dropout_layer(out)))
-
+        if  self.emb_type != "no_attn":
+            out=self.attention_module(out)
+            # print(f"after attn out: {out.shape}")
+            res = self.sig(self.fc(self.dropout_layer(out)))
+        else:
+            res = self.sig(self.fc1(self.dropout_layer(out)))
         # res = res[:, :-1, :]
         # pred_res = self._get_next_pred(res, skill)
         

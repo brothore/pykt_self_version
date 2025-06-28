@@ -1,3 +1,4 @@
+#归一化的指标
 import os
 import argparse
 import json

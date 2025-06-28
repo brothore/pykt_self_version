@@ -4,7 +4,7 @@ from wandb_train import main
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_name", type=str, default="assist2015")
-    parser.add_argument("--model_name", type=str, default="atkt")
+    parser.add_argument("--model_name", type=str, default="atktfix")
     parser.add_argument("--emb_type", type=str, default="qid")
     parser.add_argument("--save_dir", type=str, default="saved_model")
     # parser.add_argument("--learning_rate", type=float, default=1e-5)
@@ -20,8 +20,10 @@ if __name__ == "__main__":
     parser.add_argument("--beta", type=float, default=0.2)
     parser.add_argument("--learning_rate", type=float, default=1e-3)
 
-    parser.add_argument("--use_wandb", type=int, default=1)
+    parser.add_argument("--use_wandb", type=int, default=0)
+    parser.add_argument("--predict_after_train", type=int, default=1)
     parser.add_argument("--add_uuid", type=int, default=1)
+    parser.add_argument("--other_name", type=str, default="no_qid")
 
     args = parser.parse_args()
 

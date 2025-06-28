@@ -210,12 +210,12 @@ def evaluate_single_student(params, student_id):
     
     # 将评估结果保存到单独的JSON文件
     results_path = os.path.join(save_dir, f"evaluation_results_{student_id}.json")
-    try:
-        with open(results_path, "w") as fout:
-            json.dump(dres, fout, indent=4, ensure_ascii=False)
-        print(f"学生 {student_id}: 评估结果已保存到 {results_path}")
-    except Exception as e:
-        print(f"学生 {student_id}: 保存评估结果时出错: {e}")
+    # try:
+    with open(results_path, "w") as fout:
+        json.dump(dres, fout, indent=4, ensure_ascii=False)
+    print(f"学生 {student_id}: 评估结果已保存到 {results_path}")
+    # except Exception as e:
+    #     print(f"学生 {student_id}: 保存评估结果时出错: {e}")
 
     return dres
 
@@ -290,19 +290,19 @@ def main(params):
                 valid_windowauc = df['windowauclate_mean'][df['windowauclate_mean'] != -1]
                 if len(valid_windowauc) > 0:
                     print(f"\nwindowauclate_mean统计:")
-                    print(f"  最小值: {valid_windowauc.min():.4f}")
-                    print(f"  最大值: {valid_windowauc.max():.4f}")
-                    print(f"  平均值: {valid_windowauc.mean():.4f}")
-                    print(f"  标准差: {valid_windowauc.std():.4f}")
+                    print(f"  最小值: {valid_windowauc.min():.6f}")
+                    print(f"  最大值: {valid_windowauc.max():.6f}")
+                    print(f"  平均值: {valid_windowauc.mean():.6f}")
+                    print(f"  标准差: {valid_windowauc.std():.6f}")
             
             if 'windowacclate_mean' in df.columns:
                 valid_windowacc = df['windowacclate_mean'][df['windowacclate_mean'] != -1]
                 if len(valid_windowacc) > 0:
                     print(f"\nwindowacclate_mean统计:")
-                    print(f"  最小值: {valid_windowacc.min():.4f}")
-                    print(f"  最大值: {valid_windowacc.max():.4f}")
-                    print(f"  平均值: {valid_windowacc.mean():.4f}")
-                    print(f"  标准差: {valid_windowacc.std():.4f}")
+                    print(f"  最小值: {valid_windowacc.min():.6f}")
+                    print(f"  最大值: {valid_windowacc.max():.6f}")
+                    print(f"  平均值: {valid_windowacc.mean():.6f}")
+                    print(f"  标准差: {valid_windowacc.std():.6f}")
                     
         except Exception as e:
             print(f"保存CSV文件时出错: {e}")
