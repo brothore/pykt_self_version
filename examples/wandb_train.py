@@ -1,7 +1,7 @@
 import os
 import argparse
 import json
-from wandb_z_predict import main as predict_main
+from wandb_multi_predict import main as predict_main
 import torch
 torch.set_num_threads(4) 
 from torch.optim import SGD, Adam

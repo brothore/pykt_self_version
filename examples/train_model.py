@@ -1919,10 +1919,25 @@ def model_forward(model, data, opt=None, rel=None,model_config={},data_label=0):
     elif model_name in ["saint"]:
         y = model(cq.long(), cc.long(), r.long())
         ys.append(y[:, 1:])
-    elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt"]:               
+    elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT"]:               
         y, reg_loss = model(cc.long(), cr.long(), cq.long())
         ys.append(y[:,1:])
         preloss.append(reg_loss)
+
+    elif model_name in ["atakt"]: 
+
+        y, features = model(cc.long(), cr.long(), cq.long())
+        y = y[:,1:]
+        loss = cal_loss(model, [y], r, rshft, sm)
+        # at
+        features_grad = grad(loss, features, retain_graph=True)
+        p_adv = torch.FloatTensor(model.epsilon * _l2_normalize_adv(features_grad[0].data))
+        p_adv = Variable(p_adv).to(device)
+        pred_res, _ = model(cc.long(), cr.long(), cq.long(), p_adv)
+        # second loss
+        pred_res = pred_res[:,1:]
+        adv_loss = cal_loss(model, [pred_res], r, rshft, sm)
+        loss = loss + model.beta * adv_loss
     elif model_name in ["atkt", "atktfix"]:
         y, features = model(c.long(), r.long())
         y = (y * one_hot(cshft.long(), model.num_c)).sum(-1)
