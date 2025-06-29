@@ -26,7 +26,7 @@ from .atkt import _l2_normalize_adv
 from ..utils.utils import debug_print
 from pykt.config import que_type_models
 from pykt.config import FOCAL_LOSS,freeze_epoch
-from pykt.config import MULTI_LEVEL_TRAIN,SMOTE_METHOD
+from pykt.config import MULTI_LEVEL_TRAIN,SMOTE_METHOD,STD_OUTPUT
 import pandas as pd
 import time  # 导入时间模块
 import pykt.models.glo
@@ -2065,12 +2065,17 @@ def train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, t
                 scheduler.step()  # 更新学习率
 
             loss_mean = np.mean(loss_mean)
-            
-            if model.model_name == 'rkt':
-                auc, acc = evaluate(model, valid_loader, model.model_name, rel)
-            else:
-                auc, acc = evaluate(model, valid_loader, model.model_name)
+            if not STD_OUTPUT:
 
+                if model.model_name == 'rkt':
+                    auc, acc = evaluate(model, valid_loader, model.model_name, rel)
+                else:
+                    auc, acc = evaluate(model, valid_loader, model.model_name)
+            else:
+                if model.model_name == 'rkt':
+                    auc, acc ,auc_std = evaluate(model, valid_loader, model.model_name, rel)
+                else:
+                    auc, acc ,auc_std= evaluate(model, valid_loader, model.model_name)
             if auc > max_auc + 1e-3:
                 if save_model:
                     torch.save(model.state_dict(), os.path.join(ckpt_path, model.emb_type + "_model.ckpt"))
@@ -2093,11 +2098,14 @@ def train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, t
 
             # 计算当前 epoch 的平均 forward 时间
             avg_forward_time_epoch = epoch_forward_time / epoch_forward_count if epoch_forward_count > 0 else 0.0
-
-            print(f"Epoch: {i}, validauc: {validauc:.4}, validacc: {validacc:.4}, best epoch: {best_epoch}, best auc: {max_auc:.4}, train loss: {loss_mean}, emb_type: {model.emb_type}, model: {model.model_name}, save_dir: {ckpt_path}")
-            print(f"            testauc: {round(testauc,4)}, testacc: {round(testacc,4)}, window_testauc: {round(window_testauc,4)}, window_testacc: {round(window_testacc,4)}")
-            print(f"            Avg Forward Time this Epoch: {avg_forward_time_epoch:.6f} seconds")
-
+            if STD_OUTPUT:
+                print(f"Epoch: {i}, validauc: {validauc:.4}, validacc: {validacc:.4},auc_std{auc_std:.6}, best epoch: {best_epoch}, best auc: {max_auc:.4}, train loss: {loss_mean}, emb_type: {model.emb_type}, model: {model.model_name}, save_dir: {ckpt_path}")
+                print(f"            testauc: {round(testauc,4)}, testacc: {round(testacc,4)}, window_testauc: {round(window_testauc,4)}, window_testacc: {round(window_testacc,4)}")
+                print(f"            Avg Forward Time this Epoch: {avg_forward_time_epoch:.6f} seconds")
+            else:
+                print(f"Epoch: {i}, validauc: {validauc:.4}, validacc: {validacc:.4}, best epoch: {best_epoch}, best auc: {max_auc:.4}, train loss: {loss_mean}, emb_type: {model.emb_type}, model: {model.model_name}, save_dir: {ckpt_path}")
+                print(f"            testauc: {round(testauc,4)}, testacc: {round(testacc,4)}, window_testauc: {round(window_testauc,4)}, window_testacc: {round(window_testacc,4)}")
+                print(f"            Avg Forward Time this Epoch: {avg_forward_time_epoch:.6f} seconds")
             # 检查是否提前停止
             if i - best_epoch >= 10:
                 break

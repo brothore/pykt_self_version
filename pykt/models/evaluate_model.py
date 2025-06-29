@@ -3,7 +3,7 @@ import torch
 from torch import nn
 from torch.nn.functional import one_hot
 from sklearn import metrics
-from pykt.config import que_type_models,SAVE_RESULT
+from pykt.config import que_type_models,SAVE_RESULT,STD_OUTPUT
 from ..datasets.lpkt_utils import generate_time2idx
 import pandas as pd
 import csv
@@ -88,10 +88,278 @@ def save_cur_predict_result(dres, q, r, d, t, m, sm, p):
         dres[len(dres)] = [qs, rs, ds, ts, ps, prelabels, auc, acc]
         results.append(str([qs, rs, ds, ts, ps, prelabels, auc, acc]))
     return "\n".join(results)
+# def evaluate(model, test_loader, model_name, rel=None, save_path="", save_io_path=""):
+#     std_output = STD_OUTPUT
+#     # 准备存储输入输出数据的列表
+#     all_inputs = []
+#     all_outputs = []
+    
+#     if save_path != "":
+#         fout = open(save_path, "w", encoding="utf8")
+#     with torch.no_grad():
+#         y_trues = []
+#         y_scores = []
+#         dres = dict()
+#         test_mini_index = 0
+#         for data in test_loader:
+#             if model_name in ["dkt_forget", "bakt_time"]:
+#                 dcur, dgaps = data
+#             else:
+#                 dcur = data
+#             if model_name in ["dimkt"]:
+#                 q, c, r, sd, qd = dcur["qseqs"], dcur["cseqs"], dcur["rseqs"], dcur["sdseqs"], dcur["qdseqs"]
+#                 qshft, cshft, rshft, sdshft, qdshft = dcur["shft_qseqs"], dcur["shft_cseqs"], dcur["shft_rseqs"], dcur["shft_sdseqs"], dcur["shft_qdseqs"]
+#                 sd, qd, sdshft, qdshft = sd.to(device), qd.to(device), sdshft.to(device), qdshft.to(device)
+#             else:
+#                 q, c, r = dcur["qseqs"], dcur["cseqs"], dcur["rseqs"] 
+#                 qshft, cshft, rshft= dcur["shft_qseqs"], dcur["shft_cseqs"], dcur["shft_rseqs"]
+#             m, sm = dcur["masks"], dcur["smasks"]
+#             q, c, r, qshft, cshft, rshft, m, sm = q.to(device), c.to(device), r.to(device), qshft.to(device), cshft.to(device), rshft.to(device), m.to(device), sm.to(device)
+#             cq = torch.cat((q[:,0:1], qshft), dim=1)
+#             cc = torch.cat((c[:,0:1], cshft), dim=1)
+#             cr = torch.cat((r[:,0:1], rshft), dim=1)
+#             if model.model_name in que_type_models and model_name not in ["lpkt", "rkt", "promptkt", "unikt"]:
+#                 model.model.eval()
+#             else:
+#                 model.eval()
+
+#             # 模型推理
+#             if model_name in ["atdkt"]:
+#                 y = model(dcur)
+#                 y = (y * one_hot(cshft.long(), model.num_c)).sum(-1)
+#             elif model_name in ["rkt"]:
+#                 y, attn = model(dcur, rel)
+#                 y = y[:,1:]
+#                 if q.numel() > 0:
+#                     c,cshft = q,qshft
+#             elif model_name in ["bakt_time"]:
+#                 y = model(dcur, dgaps)
+#                 y = y[:,1:]
+#             elif model_name in ["simplekt","stablekt", "sparsekt"]:
+#                 y = model(dcur)
+#                 y = y[:,1:]
+#             elif model_name in ["rekt"]:
+#                 y = model(dcur)
+#             elif model_name in ["dkt", "dkt+","LSTM_Template","CTNKT"]:
+#                 y,_ = model(c.long(), r.long())
+#                 y = (y * one_hot(cshft.long(), model.num_c)).sum(-1)
+
+#                 #全1
+#                 # shape = (cshft.size(0), cshft.size(1))
+#                 # y = torch.ones(shape, dtype=torch.float32).to(device)
+#             elif model_name in ["TCN_ABQR"]:
+#                 y, _ = model(q.long(), r.long(), c.long(), qshft.long(), cshft.long(), matrix)
+#             elif model_name in ["dkt_forget"]:
+#                 y = model(c.long(), r.long(), dgaps)
+#                 y = (y * one_hot(cshft.long(), model.num_c)).sum(-1)
+#             elif model_name in ["dkvmn","deep_irt", "skvmn","deep_irt"]:
+#                 y = model(cc.long(), cr.long())
+#                 y = y[:,1:]
+#             elif model_name in ["kqn", "sakt"]:
+#                 y = model(c.long(), r.long(), cshft.long())
+#             elif model_name == "saint":
+#                 y = model(cq.long(), cc.long(), r.long())
+#                 y = y[:, 1:]
+#             elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt"]:                                
+#                 y, reg_loss,_ = model(cc.long(), cr.long(), cq.long())
+#                 y = y[:,1:]
+#             elif model_name in ["dtransformer"]:
+#                 output, *_ = model.predict(cc.long(), cr.long(), cq.long())
+#                 sg = nn.Sigmoid()
+#                 y = sg(output)
+#                 y = y[:,1:]
+#             elif model_name in ["atkt", "atktfix"]:
+#                 y, _ = model(c.long(), r.long())
+#                 y = (y * one_hot(cshft.long(), model.num_c)).sum(-1)
+#             elif model_name == "gkt":
+#                 y = model(cc.long(), cr.long())
+#             elif model_name == "lpkt":
+#                 cit = torch.cat((dcur["itseqs"][:,0:1], dcur["shft_itseqs"]), dim=1)
+#                 y = model(cq.long(), cr.long(), cit.long())
+#                 y = y[:,1:]
+#                 c,cshft = q,qshft
+#             elif model_name == "hawkes":
+#                 ct = torch.cat((dcur["tseqs"][:,0:1], dcur["shft_tseqs"]), dim=1)
+#                 y = model(cc.long(), cq.long(), ct.long(), cr.long())
+#                 y = y[:, 1:]
+#             elif model_name in que_type_models and model_name not in ["lpkt", "promptkt"]:
+#                 y = model.predict_one_step(data)
+#                 c,cshft = q,qshft
+#             elif model_name in ["promptkt"]:
+#                 y = model(dcur)
+#                 y = y[:, 1:]
+#                 if q.size(1) != 0:
+#                     c, cshft = q, qshft
+#             elif model_name == "dimkt":
+#                 y = model(q.long(),c.long(),sd.long(),qd.long(),r.long(),qshft.long(),cshft.long(),sdshft.long(),qdshft.long())
+            
+#             if save_path != "":
+#                 result = save_cur_predict_result(dres, c, r, cshft, rshft, m, sm, y)
+#                 fout.write(result+"\n")
+
+#             # 提取有效的预测和真实值（用于计算指标）
+#             y_valid = torch.masked_select(y, sm).detach().cpu().numpy()
+#             t_valid = torch.masked_select(rshft, sm).detach().cpu().numpy()
+            
+#             # === 修改：只保存每个序列的最后一个有效预测位置 ===
+#             # 找到每个序列的最后一个有效位置（待预测位置）
+#             batch_size = sm.size(0)
+            
+#             for batch_idx in range(batch_size):
+#                 # 找到当前序列中最后一个有效位置
+#                 valid_mask_seq = sm[batch_idx]  # 当前序列的有效掩码
+#                 valid_positions_seq = torch.where(valid_mask_seq)[0]  # 当前序列中所有有效位置
+                
+#                 if len(valid_positions_seq) > 0:
+#                     # 获取最后一个有效位置
+#                     last_valid_pos = valid_positions_seq[-1].item()
+                    
+#                     # 获取对应学生的完整序列
+#                     q_seq = q[batch_idx].detach().cpu().numpy()
+#                     c_seq = c[batch_idx].detach().cpu().numpy()
+#                     r_seq = r[batch_idx].detach().cpu().numpy()
+#                     qshft_seq = qshft[batch_idx].detach().cpu().numpy()
+#                     cshft_seq = cshft[batch_idx].detach().cpu().numpy()
+#                     rshft_seq = rshft[batch_idx].detach().cpu().numpy()
+#                     y_seq = y[batch_idx].detach().cpu().numpy()
+#                     sm_seq = sm[batch_idx].detach().cpu().numpy()
+                    
+#                     # 获取最后一个有效位置的预测值和真实值
+#                     current_prediction_prob = y[batch_idx, last_valid_pos].item()  # 原始预测概率
+#                     current_prediction_binary = 1 if current_prediction_prob >= 0.5 else 0  # 0.5阈值转换
+#                     current_true_label = int(rshft[batch_idx, last_valid_pos].item())
+                    
+#                     # 判断预测是否正确
+#                     is_correct = (current_prediction_binary == current_true_label)
+                    
+#                     # === 修改：将序列数据转换为合适的格式 ===
+#                     input_data = {
+#                         "student_idx": test_mini_index + batch_idx,
+#                         "position": last_valid_pos,
+#                         "current_q": int(qshft[batch_idx, last_valid_pos].item()),
+#                         "current_c": int(cshft[batch_idx, last_valid_pos].item()),
+#                         "prediction_prob": float(current_prediction_prob),  # 原始预测概率
+#                         "prediction": current_prediction_binary,  # 经过0.5阈值转换的预测
+#                         "true_label": current_true_label,
+#                         "is_correct": is_correct,  # 新增：预测是否正确
+#                         "sequence_length": len(q_seq),
+#                         "q_full_sequence": q_seq.tolist(),  # 保持为列表，稍后处理
+#                         "c_full_sequence": c_seq.tolist(),
+#                         "r_full_sequence": r_seq.tolist(),
+#                         "qshft_full_sequence": qshft_seq.tolist(),
+#                         "cshft_full_sequence": cshft_seq.tolist(),
+#                         "rshft_full_sequence": rshft_seq.tolist(),
+#                         "prediction_full_sequence": y_seq.tolist(),
+#                         "valid_mask": sm_seq.tolist()
+#                     }
+                    
+#                     # 对于特殊模型添加额外数据
+#                     if model_name == "dimkt":
+#                         sd_seq = sd[batch_idx].detach().cpu().numpy()
+#                         qd_seq = qd[batch_idx].detach().cpu().numpy()
+#                         sdshft_seq = sdshft[batch_idx].detach().cpu().numpy()
+#                         qdshft_seq = qdshft[batch_idx].detach().cpu().numpy()
+                        
+#                         input_data["sd_full_sequence"] = sd_seq.tolist()
+#                         input_data["qd_full_sequence"] = qd_seq.tolist()
+#                         input_data["sdshft_full_sequence"] = sdshft_seq.tolist()
+#                         input_data["qdshft_full_sequence"] = qdshft_seq.tolist()
+                    
+#                     all_inputs.append(input_data)
+            
+#             y_trues.append(t_valid)
+#             y_scores.append(y_valid)
+#             test_mini_index += q.size(0)  # 加上batch_size
+
+#         ts = np.concatenate(y_trues, axis=0)
+#         ps = np.concatenate(y_scores, axis=0)
+#         print(f"ts.shape: {ts.shape}, ps.shape: {ps.shape}")
+#         auc = metrics.roc_auc_score(y_true=ts, y_score=ps)
+#         prelabels = [1 if p >= 0.5 else 0 for p in ps]
+#         acc = metrics.accuracy_score(ts, prelabels)
+    
+#     # === 修改：确保正确的CSV格式保存 ===
+#     if save_io_path != None and SAVE_RESULT:
+#         import pandas as pd
+#         import csv
+        
+#         # 如果没有数据，直接返回
+#         if not all_inputs:
+#             print("没有数据需要保存")
+#             return auc, acc
+        
+#         # 定义明确的列顺序和列名
+#         column_names = [
+#             'student_idx',
+#             'position', 
+#             'current_q',
+#             'current_c',
+#             'prediction_prob',
+#             'prediction',
+#             'true_label',
+#             'is_correct',
+#             'sequence_length',
+#             'q_full_sequence',
+#             'c_full_sequence', 
+#             'r_full_sequence',
+#             'qshft_full_sequence',
+#             'cshft_full_sequence',
+#             'rshft_full_sequence',
+#             'prediction_full_sequence',
+#             'valid_mask'
+#         ]
+        
+#         # 如果是dimkt模型，添加额外的列
+#         if model_name == "dimkt" and all_inputs:
+#             if 'sd_full_sequence' in all_inputs[0]:
+#                 column_names.extend([
+#                     'sd_full_sequence',
+#                     'qd_full_sequence', 
+#                     'sdshft_full_sequence',
+#                     'qdshft_full_sequence'
+#                 ])
+        
+#         # 手动写入CSV文件，确保格式正确
+#         # with open(save_io_path, 'w', newline='', encoding='utf-8-sig') as csvfile:
+#         #     writer = csv.writer(csvfile, quoting=csv.QUOTE_MINIMAL)
+            
+#         #     # 写入表头
+#         #     writer.writerow(column_names)
+            
+#         #     # 写入数据行
+#         #     for data in all_inputs:
+#         #         row = []
+#         #         for col_name in column_names:
+#         #             if col_name in data:
+#         #                 value = data[col_name]
+#         #                 # 对于包含逗号的字符串数据，需要特殊处理
+#         #                 if isinstance(value, (list, tuple)):
+#         #                     # 将列表转换为用分号分隔的字符串，避免逗号干扰
+#         #                     row.append(';'.join(map(str, value)))
+#         #                 elif isinstance(value, str) and '[' in value:
+#         #                     # 如果是字符串化的列表，用引号包围
+#         #                     row.append(f'"{value}"')
+#         #                 else:
+#         #                     row.append(value)
+#         #             else:
+#         #                 row.append('')  # 空值
+#         #         writer.writerow(row)
+        
+#         # print(f"保存了 {len(all_inputs)} 个序列的待预测位置数据到 {save_io_path}")
+#         # print(f"预测正确的数量：{sum(1 for x in all_inputs if x['is_correct'])}")
+#         # print(f"预测准确率：{sum(x['is_correct'] for x in all_inputs) / len(all_inputs):.4f}")
+#         # print(f"CSV文件列名：{column_names}")
+#         # print("注意：序列数据使用分号(;)分隔以避免逗号冲突")
+    
+#     return auc, acc
 def evaluate(model, test_loader, model_name, rel=None, save_path="", save_io_path=""):
+    std_output = STD_OUTPUT
     # 准备存储输入输出数据的列表
     all_inputs = []
     all_outputs = []
+    
+    # 新增：为计算每个batch的AUC准备的列表
+    batch_aucs = []
     
     if save_path != "":
         fout = open(save_path, "w", encoding="utf8")
@@ -200,6 +468,19 @@ def evaluate(model, test_loader, model_name, rel=None, save_path="", save_io_pat
             y_valid = torch.masked_select(y, sm).detach().cpu().numpy()
             t_valid = torch.masked_select(rshft, sm).detach().cpu().numpy()
             
+            # 新增：如果STD_OUTPUT为1，计算当前batch的AUC
+            if std_output == 1:
+                try:
+                    # 检查当前batch是否有足够的正负样本来计算AUC
+                    if len(np.unique(t_valid)) > 1 and len(t_valid) > 0:
+                        batch_auc = metrics.roc_auc_score(y_true=t_valid, y_score=y_valid)
+                        batch_aucs.append(batch_auc)
+                        print(f"Batch {len(batch_aucs)}: AUC = {batch_auc:.4f}, samples = {len(t_valid)}")
+                    else:
+                        print(f"Batch {len(batch_aucs)+1}: 跳过AUC计算 (标签类别不足或样本为空)")
+                except Exception as e:
+                    print(f"Batch {len(batch_aucs)+1}: AUC计算出错 - {e}")
+            
             # === 修改：只保存每个序列的最后一个有效预测位置 ===
             # 找到每个序列的最后一个有效位置（待预测位置）
             batch_size = sm.size(0)
@@ -276,6 +557,19 @@ def evaluate(model, test_loader, model_name, rel=None, save_path="", save_io_pat
         auc = metrics.roc_auc_score(y_true=ts, y_score=ps)
         prelabels = [1 if p >= 0.5 else 0 for p in ps]
         acc = metrics.accuracy_score(ts, prelabels)
+        
+        # 新增：如果STD_OUTPUT为1，计算AUC的标准差
+        if std_output == 1 and len(batch_aucs) > 0:
+            auc_std = np.std(batch_aucs, ddof=1)  # 使用样本标准差
+            auc_mean = np.mean(batch_aucs)
+            print(f"批次AUC统计信息:")
+            print(f"  有效批次数量: {len(batch_aucs)}")
+            print(f"  AUC均值: {auc_mean:.4f}")
+            print(f"  AUC标准差: {auc_std:.4f}")
+            print(f"  AUC范围: [{min(batch_aucs):.4f}, {max(batch_aucs):.4f}]")
+        else:
+            auc_std = 0.0
+            print("未计算批次AUC标准差 (STD_OUTPUT != 1 或无有效批次)")
     
     # === 修改：确保正确的CSV格式保存 ===
     if save_io_path != None and SAVE_RESULT:
@@ -285,7 +579,10 @@ def evaluate(model, test_loader, model_name, rel=None, save_path="", save_io_pat
         # 如果没有数据，直接返回
         if not all_inputs:
             print("没有数据需要保存")
-            return auc, acc
+            if std_output == 1:
+                return auc, acc, auc_std
+            else:
+                return auc, acc
         
         # 定义明确的列顺序和列名
         column_names = [
@@ -317,40 +614,14 @@ def evaluate(model, test_loader, model_name, rel=None, save_path="", save_io_pat
                     'sdshft_full_sequence',
                     'qdshft_full_sequence'
                 ])
-        
-        # 手动写入CSV文件，确保格式正确
-        # with open(save_io_path, 'w', newline='', encoding='utf-8-sig') as csvfile:
-        #     writer = csv.writer(csvfile, quoting=csv.QUOTE_MINIMAL)
-            
-        #     # 写入表头
-        #     writer.writerow(column_names)
-            
-        #     # 写入数据行
-        #     for data in all_inputs:
-        #         row = []
-        #         for col_name in column_names:
-        #             if col_name in data:
-        #                 value = data[col_name]
-        #                 # 对于包含逗号的字符串数据，需要特殊处理
-        #                 if isinstance(value, (list, tuple)):
-        #                     # 将列表转换为用分号分隔的字符串，避免逗号干扰
-        #                     row.append(';'.join(map(str, value)))
-        #                 elif isinstance(value, str) and '[' in value:
-        #                     # 如果是字符串化的列表，用引号包围
-        #                     row.append(f'"{value}"')
-        #                 else:
-        #                     row.append(value)
-        #             else:
-        #                 row.append('')  # 空值
-        #         writer.writerow(row)
-        
-        # print(f"保存了 {len(all_inputs)} 个序列的待预测位置数据到 {save_io_path}")
-        # print(f"预测正确的数量：{sum(1 for x in all_inputs if x['is_correct'])}")
-        # print(f"预测准确率：{sum(x['is_correct'] for x in all_inputs) / len(all_inputs):.4f}")
-        # print(f"CSV文件列名：{column_names}")
-        # print("注意：序列数据使用分号(;)分隔以避免逗号冲突")
     
-    return auc, acc
+    # 修改返回值：如果STD_OUTPUT为1，返回AUC标准差
+    if std_output == 1:
+        return auc, acc, auc_std
+    else:
+        return auc, acc
+
+
 def early_fusion(curhs, model, model_name):
     if model_name in ["dkvmn","skvmn"]:
         p = model.p_layer(model.dropout_layer(curhs[0]))

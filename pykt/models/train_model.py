@@ -36,7 +36,7 @@ from .atkt import _l2_normalize_adv
 from ..utils.utils import debug_print
 from pykt.config import que_type_models
 from pykt.config import FOCAL_LOSS,freeze_epoch
-from pykt.config import MULTI_LEVEL_TRAIN,SMOTE_METHOD
+from pykt.config import MULTI_LEVEL_TRAIN,SMOTE_METHOD,STD_OUTPUT,PLT_TRAIN
 import pandas as pd
 import time  # 导入时间模块
 import pykt.models.glo
@@ -399,7 +399,7 @@ def cal_loss(model, ys, r, rshft, sm, preloss=[]):
 def model_forward(model, data, writer: PredictionWriter,opt=None, rel=None,model_config={},data_label=0):
     # print(f"model_config5: {model_config}")
     global ii
-    print(f"model forward{ii}")
+    # print(f"model forward{ii}")
     ii = ii+1
     model_name = model.model_name
     # if model_name in ["dkt_forget", "lpkt"]:
@@ -657,6 +657,169 @@ def save_results_to_file(results, folder_path, file_name="results.txt"):
             f.write(f"{key}: {value}\n")
     print(f"结果已保存到文件: {file_path}")
     
+# def train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, test_loader=None, test_window_loader=None, save_model=False, data_config=None, fold=None,emb_sizess=128,model_config={},level1_loader=None,level2_loader=None,level3_loader=None):
+    
+#     if MULTI_LEVEL_TRAIN == 1:
+#         # 使用多级训练
+#         return train_model_multilevel_custom(
+#     model, train_loader, valid_loader, num_epochs, opt, ckpt_path,
+#     level1_loader,level2_loader, level3_loader, freeze_epoch, 
+#     test_loader, test_window_loader, save_model, data_config, fold, emb_sizess, model_config
+# )
+#     else:
+#         max_auc, best_epoch = 0, -1
+#         train_step = 0
+#         # print(f"model_config3: {model_config}")
+#         rel = None
+#         if model.model_name == "rkt":
+#             dpath = data_config["dpath"]
+#             dataset_name = dpath.split("/")[-1]
+#             tmp_folds = set(data_config["folds"]) - {fold}
+#             folds_str = "_" + "_".join([str(_) for _ in tmp_folds])
+#             if dataset_name in ["algebra2005", "bridge2algebra2006"]:
+#                 fname = "phi_dict" + folds_str + ".pkl"
+#                 rel = pd.read_pickle(os.path.join(dpath, fname))
+#             else:
+#                 fname = "phi_array" + folds_str + ".pkl" 
+#                 rel = pd.read_pickle(os.path.join(dpath, fname))
+
+#         if model.model_name=='lpkt':
+#             scheduler = torch.optim.lr_scheduler.StepLR(opt, 10, gamma=0.5)
+        
+#         total_forward_time = 0.0  # 累计所有 forward 的时间
+#         total_epoch_time = 0.0    # 累计所有 epoch 的时间
+#         total_forward_count = 0    # 累计所有 forward 的次数
+
+#         for i in range(1, num_epochs + 1):
+#             epoch_start_time = time.time()  # 记录 epoch 开始时间
+#             loss_mean = []
+#             epoch_forward_time = 0.0       # 当前 epoch 的 forward 时间
+#             epoch_forward_count = 0         # 当前 epoch 的 forward 次数
+#             global ii
+#             ii = 0
+
+                
+                
+#             for data in train_loader:
+#                 train_step += 1
+#                 if model.model_name in que_type_models and model.model_name not in ["lpkt", "rkt"]:
+#                     model.model.train()
+#                 else:
+#                     model.train()
+                
+#                 # 记录 forward 开始时间
+#                 forward_start = time.time()
+                
+#                 if model.model_name=='rkt':
+#                     loss = model_forward(model, data, rel)
+#                 elif model.model_name=='TCN_ABQR':
+#                     print("entered_here!")
+#                     print(f"model_config4: {model_config}")
+#                     loss = model_forward(model, data,opt, rel,model_config=model_config)
+#                 else:
+#                     writer = PredictionWriter("/root/autodl-tmp/pykt_self_version/data/assist2009/train_valid_sequences.csv")
+#                     loss = model_forward(model, data,writer)
+                
+#                 # 记录 forward 结束时间
+#                 forward_end = time.time()
+#                 forward_duration = forward_end - forward_start
+
+#                 # 更新时间统计
+#                 epoch_forward_time += forward_duration
+#                 epoch_forward_count += 1
+#                 total_forward_time += forward_duration
+#                 total_forward_count += 1
+#                 if model.model_name != "TCN_ABQR":
+#                     opt.zero_grad()
+#                     loss.backward()  # 计算梯度
+#                 if model.model_name == "rkt":
+#                     clip_grad_norm_(model.parameters(), model.grad_clip)
+#                 if model.model_name == "dtransformer":
+#                     torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+#                 opt.step()  # 更新模型参数
+
+#                 loss_mean.append(loss.detach().cpu().numpy())
+#                 if model.model_name == "gkt" and train_step % 10 == 0:
+#                     text = f"Total train step is {train_step}, the loss is {loss.item():.5}"
+#                     debug_print(text=text, fuc_name="train_model")
+            
+#             if model.model_name == 'lpkt':
+#                 scheduler.step()  # 更新学习率
+
+#             loss_mean = np.mean(loss_mean)
+            
+#             if not STD_OUTPUT:
+
+#                 if model.model_name == 'rkt':
+#                     auc, acc = evaluate(model, valid_loader, model.model_name, rel)
+#                 else:
+#                     auc, acc = evaluate(model, valid_loader, model.model_name)
+#             else:
+#                 if model.model_name == 'rkt':
+#                     auc, acc ,auc_std = evaluate(model, valid_loader, model.model_name, rel)
+#                 else:
+#                     auc, acc ,auc_std= evaluate(model, valid_loader, model.model_name)
+#             if auc > max_auc + 1e-3:
+#                 if save_model:
+#                     torch.save(model.state_dict(), os.path.join(ckpt_path, model.emb_type + "_model.ckpt"))
+#                 max_auc = auc
+#                 best_epoch = i
+#                 testauc, testacc = -1, -1
+#                 window_testauc, window_testacc = -1, -1
+#                 if not save_model:
+#                     if test_loader is not None:
+#                         save_test_path = os.path.join(ckpt_path, model.emb_type + "_test_predictions.txt")
+#                         testauc, testacc = evaluate(model, test_loader, model.model_name, save_test_path)
+#                     if test_window_loader is not None:
+#                         save_test_path = os.path.join(ckpt_path, model.emb_type + "_test_window_predictions.txt")
+#                         window_testauc, window_testacc = evaluate(model, test_window_loader, model.model_name, save_test_path)
+#                 validauc, validacc = auc, acc
+            
+#             epoch_end_time = time.time()  # 记录 epoch 结束时间
+#             epoch_duration = epoch_end_time - epoch_start_time
+#             total_epoch_time += epoch_duration
+
+#             # 计算当前 epoch 的平均 forward 时间
+#             avg_forward_time_epoch = epoch_forward_time / epoch_forward_count if epoch_forward_count > 0 else 0.0
+
+#             if STD_OUTPUT:
+#                 print(f"Epoch: {i}, validauc: {validauc:.4}, validacc: {validacc:.4},auc_std:{auc_std:.6}, best epoch: {best_epoch}, best auc: {max_auc:.4}, train loss: {loss_mean}, emb_type: {model.emb_type}, model: {model.model_name}, save_dir: {ckpt_path}")
+#                 print(f"            testauc: {round(testauc,4)}, testacc: {round(testacc,4)}, window_testauc: {round(window_testauc,4)}, window_testacc: {round(window_testacc,4)}")
+#                 print(f"            Avg Forward Time this Epoch: {avg_forward_time_epoch:.6f} seconds")
+#             else:
+#                 print(f"Epoch: {i}, validauc: {validauc:.4}, validacc: {validacc:.4}, best epoch: {best_epoch}, best auc: {max_auc:.4}, train loss: {loss_mean}, emb_type: {model.emb_type}, model: {model.model_name}, save_dir: {ckpt_path}")
+#                 print(f"            testauc: {round(testauc,4)}, testacc: {round(testacc,4)}, window_testauc: {round(window_testauc,4)}, window_testacc: {round(window_testacc,4)}")
+#                 print(f"            Avg Forward Time this Epoch: {avg_forward_time_epoch:.6f} seconds")
+
+#             # 检查是否提前停止
+#             if i - best_epoch >= 10:
+#                 break
+
+#         # 训练结束后，计算所有 forward 的平均时间和所有 epoch 的平均时间
+#         overall_avg_forward_time = total_forward_time / total_forward_count if total_forward_count > 0 else 0.0
+#         avg_epoch_time = total_epoch_time / i if i > 0 else 0.0
+
+#         print("\n训练结束！")
+#         print(f"每个 forward 的总体平均时间: {overall_avg_forward_time:.6f} 秒")
+#         print(f"每个 epoch 的平均时间: {avg_epoch_time:.2f} 秒")
+
+#         # 保存最终结果
+#         results = {
+#             "Best Epoch": best_epoch,
+#             "Best AUC": max_auc,
+#             "Valid AUC": validauc,
+#             "Valid Accuracy": validacc,
+#             "Test AUC": testauc,
+#             "Test Accuracy": testacc,
+#             "Window Test AUC": window_testauc,
+#             "Window Test Accuracy": window_testacc,
+#             "Overall Avg Forward Time": overall_avg_forward_time,
+#             "Avg Epoch Time": avg_epoch_time
+#         }
+#         save_results_to_file(results, ckpt_path)
+
+#         return testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch
+
 def train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, test_loader=None, test_window_loader=None, save_model=False, data_config=None, fold=None,emb_sizess=128,model_config={},level1_loader=None,level2_loader=None,level3_loader=None):
     
     if MULTI_LEVEL_TRAIN == 1:
@@ -669,6 +832,13 @@ def train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, t
     else:
         max_auc, best_epoch = 0, -1
         train_step = 0
+        
+        # 新增：用于绘制曲线的数据记录
+        epoch_list = []
+        validauc_list = []
+        auc_std_list = []
+        prev_auc_std = None  # 记录上一次的auc_std，用于显示变化箭头
+        
         # print(f"model_config3: {model_config}")
         rel = None
         if model.model_name == "rkt":
@@ -748,11 +918,34 @@ def train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, t
 
             loss_mean = np.mean(loss_mean)
             
-            if model.model_name == 'rkt':
-                auc, acc = evaluate(model, valid_loader, model.model_name, rel)
+            if not STD_OUTPUT:
+                if model.model_name == 'rkt':
+                    auc, acc = evaluate(model, valid_loader, model.model_name, rel)
+                else:
+                    auc, acc = evaluate(model, valid_loader, model.model_name)
+                auc_std = 0.0  # STD_OUTPUT为False时，设置默认值
             else:
-                auc, acc = evaluate(model, valid_loader, model.model_name)
-
+                if model.model_name == 'rkt':
+                    auc, acc, auc_std = evaluate(model, valid_loader, model.model_name, rel)
+                else:
+                    auc, acc, auc_std = evaluate(model, valid_loader, model.model_name)
+            
+            # 新增：记录当前epoch的数据用于绘图
+            epoch_list.append(i)
+            validauc_list.append(auc)
+            auc_std_list.append(auc_std)
+            
+            # 新增：计算auc_std变化趋势箭头
+            auc_std_arrow = ""
+            if STD_OUTPUT and prev_auc_std is not None:
+                if auc_std > prev_auc_std:
+                    auc_std_arrow = " ↑"
+                elif auc_std < prev_auc_std:
+                    auc_std_arrow = " ↓"
+                else:
+                    auc_std_arrow = " →"
+            prev_auc_std = auc_std
+            
             if auc > max_auc + 1e-3:
                 if save_model:
                     torch.save(model.state_dict(), os.path.join(ckpt_path, model.emb_type + "_model.ckpt"))
@@ -776,9 +969,14 @@ def train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, t
             # 计算当前 epoch 的平均 forward 时间
             avg_forward_time_epoch = epoch_forward_time / epoch_forward_count if epoch_forward_count > 0 else 0.0
 
-            print(f"Epoch: {i}, validauc: {validauc:.4}, validacc: {validacc:.4}, best epoch: {best_epoch}, best auc: {max_auc:.4}, train loss: {loss_mean}, emb_type: {model.emb_type}, model: {model.model_name}, save_dir: {ckpt_path}")
-            print(f"            testauc: {round(testauc,4)}, testacc: {round(testacc,4)}, window_testauc: {round(window_testauc,4)}, window_testacc: {round(window_testacc,4)}")
-            print(f"            Avg Forward Time this Epoch: {avg_forward_time_epoch:.6f} seconds")
+            if STD_OUTPUT:
+                print(f"Epoch: {i}, validauc: {validauc:.4}, validacc: {validacc:.4}, auc_std: {auc_std:.6}{auc_std_arrow}, best epoch: {best_epoch}, best auc: {max_auc:.4}, train loss: {loss_mean}, emb_type: {model.emb_type}, model: {model.model_name}, save_dir: {ckpt_path}")
+                print(f"            testauc: {round(testauc,4)}, testacc: {round(testacc,4)}, window_testauc: {round(window_testauc,4)}, window_testacc: {round(window_testacc,4)}")
+                print(f"            Avg Forward Time this Epoch: {avg_forward_time_epoch:.6f} seconds")
+            else:
+                print(f"Epoch: {i}, validauc: {validauc:.4}, validacc: {validacc:.4}, best epoch: {best_epoch}, best auc: {max_auc:.4}, train loss: {loss_mean}, emb_type: {model.emb_type}, model: {model.model_name}, save_dir: {ckpt_path}")
+                print(f"            testauc: {round(testauc,4)}, testacc: {round(testacc,4)}, window_testauc: {round(window_testauc,4)}, window_testacc: {round(window_testacc,4)}")
+                print(f"            Avg Forward Time this Epoch: {avg_forward_time_epoch:.6f} seconds")
 
             # 检查是否提前停止
             if i - best_epoch >= 10:
@@ -791,6 +989,9 @@ def train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, t
         print("\n训练结束！")
         print(f"每个 forward 的总体平均时间: {overall_avg_forward_time:.6f} 秒")
         print(f"每个 epoch 的平均时间: {avg_epoch_time:.2f} 秒")
+
+        # 新增：绘制并保存曲线图
+        plot_training_curves(epoch_list, validauc_list, auc_std_list, ckpt_path, model.emb_type, model.model_name)
 
         # 保存最终结果
         results = {
@@ -810,6 +1011,91 @@ def train_model(model, train_loader, valid_loader, num_epochs, opt, ckpt_path, t
         return testauc, testacc, window_testauc, window_testacc, validauc, validacc, best_epoch
 
 
+def plot_training_curves(epoch_list, validauc_list, auc_std_list, ckpt_path, emb_type, model_name):
+    """
+    绘制并保存训练过程中的validauc和auc_std曲线图
+    
+    Args:
+        epoch_list: epoch列表
+        validauc_list: 每个epoch的validauc值
+        auc_std_list: 每个epoch的auc_std值
+        ckpt_path: 模型保存路径
+        emb_type: 嵌入类型
+        model_name: 模型名称
+    """
+    import matplotlib.pyplot as plt
+    import os
+    
+    # 设置中文字体支持（可选）
+    plt.rcParams['font.size'] = 12
+    plt.rcParams['figure.figsize'] = (12, 5)
+    
+    # 创建包含两个子图的图像
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    # 子图1: Valid AUC曲线
+    ax1.plot(epoch_list, validauc_list, 'b-o', linewidth=2, markersize=4, label='Valid AUC')
+    ax1.set_xlabel('Epoch')
+    ax1.set_ylabel('Valid AUC')
+    ax1.set_title(f'Valid AUC vs Epoch\n{model_name} ({emb_type})')
+    ax1.grid(True, alpha=0.3)
+    ax1.legend()
+    
+    # 找出最高AUC点并标记
+    if validauc_list:
+        max_auc_idx = validauc_list.index(max(validauc_list))
+        max_auc_epoch = epoch_list[max_auc_idx]
+        max_auc_value = validauc_list[max_auc_idx]
+        ax1.plot(max_auc_epoch, max_auc_value, 'r*', markersize=12, label=f'Best AUC: {max_auc_value:.4f}')
+        ax1.legend()
+    
+    # 子图2: AUC Std曲线
+    if any(std > 0 for std in auc_std_list):  # 只有当有非零的std值时才绘制
+        ax2.plot(epoch_list, auc_std_list, 'r-s', linewidth=2, markersize=4, label='AUC Std')
+        ax2.set_xlabel('Epoch')
+        ax2.set_ylabel('AUC Standard Deviation')
+        ax2.set_title(f'AUC Std vs Epoch\n{model_name} ({emb_type})')
+        ax2.grid(True, alpha=0.3)
+        ax2.legend()
+        
+        # 找出最低std点并标记（通常更低的std表示更稳定）
+        if auc_std_list:
+            min_std_idx = auc_std_list.index(min(auc_std_list))
+            min_std_epoch = epoch_list[min_std_idx]
+            min_std_value = auc_std_list[min_std_idx]
+            ax2.plot(min_std_epoch, min_std_value, 'g*', markersize=12, label=f'Min Std: {min_std_value:.6f}')
+            ax2.legend()
+    else:
+        ax2.text(0.5, 0.5, 'AUC Std not available\n(STD_OUTPUT = 0)', 
+                ha='center', va='center', transform=ax2.transAxes, fontsize=14)
+        ax2.set_title(f'AUC Std vs Epoch\n{model_name} ({emb_type})')
+    
+    # 调整布局
+    plt.tight_layout()
+    
+    # 保存图像
+    plot_filename = f"{emb_type}_{model_name}_training_curves.png"
+    plot_path = os.path.join(ckpt_path, plot_filename)
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print(f"训练曲线图已保存到: {plot_path}")
+    
+    # 关闭图像以释放内存
+    plt.close(fig)
+    
+    # 可选：保存数据到CSV文件以便后续分析
+    csv_filename = f"{emb_type}_{model_name}_training_data.csv"
+    csv_path = os.path.join(ckpt_path, csv_filename)
+    
+    import pandas as pd
+    training_data = pd.DataFrame({
+        'Epoch': epoch_list,
+        'Valid_AUC': validauc_list,
+        'AUC_Std': auc_std_list
+    })
+    training_data.to_csv(csv_path, index=False)
+    print(f"训练数据已保存到: {csv_path}")
+
+    
 def auto_load_BGRL(pro_embed, Q_matrix, perb,model_config,mm,force_retrain=False):
     pro_embed = pro_embed.to(device)
     Q_matrix = Q_matrix.to(device)

@@ -86,12 +86,12 @@ class ATAKT(nn.Module):
         if emb_type.startswith("qid"):
             q_embed_data, qa_embed_data = self.base_emb(q_data, target)
         if self.pert_type == "qa":
-            print(f"self.pert_type:qa")
+            # print(f"self.pert_type:qa")
             pert = qa_embed_data
             if perturbation is not None:
                 qa_embed_data += perturbation
         elif self.pert_type == "q":
-            print(f"self.pert_type:q")
+            # print(f"self.pert_type:q")
 
             pert = q_embed_data
             if perturbation is not None:
@@ -115,19 +115,19 @@ class ATAKT(nn.Module):
         else:
             c_reg_loss = 0.
         if self.pert_type == "rasch_qa":
-            print(f"self.pert_type:rasch_qa")
+            # print(f"self.pert_type:rasch_qa")
 
             pert = qa_embed_data
             if perturbation is not None:
                 qa_embed_data += perturbation
         elif self.pert_type == "rasch_q":
-            print(f"self.pert_type:rasch_q")
+            # print(f"self.pert_type:rasch_q")
 
             pert = q_embed_data
             if perturbation is not None:
                 q_embed_data += perturbation
         elif self.pert_type == "rasch_pid":
-            print(f"self.pert_type:rasch_pid")
+            # print(f"self.pert_type:rasch_pid")
 
             pert = pid_embed_data
             if perturbation is not None:
