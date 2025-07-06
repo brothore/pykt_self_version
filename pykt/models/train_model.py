@@ -599,9 +599,9 @@ def model_forward(model, data, writer: PredictionWriter,opt=None, rel=None,model
         # 添加公平性正则化项
 
         # 配置公平性正则化参数
-        fairness_alpha = model_config.get('alpha', 0.01)  # 公平性正则化强度
-        fairness_method = model_config.get('method', 'variance')  # 正则化方法
-        enable_fairness = model_config.get('enable', 1)  # 是否启用公平性正则化
+        fairness_alpha = model.alpha
+        fairness_method = model.method
+        enable_fairness = model.enable
         
         if enable_fairness:
             # 计算公平性损失并直接加到reg_loss中

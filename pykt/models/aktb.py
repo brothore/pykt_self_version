@@ -16,7 +16,7 @@ class Dim(IntEnum):
 
 class AKTB(nn.Module):
     def __init__(self, n_question, n_pid, d_model, n_blocks, dropout, d_ff=256, 
-            kq_same=1, final_fc_dim=512, num_attn_heads=8, separate_qa=False, l2=1e-5, emb_type="qid", emb_path="", pretrain_dim=768):
+            kq_same=1, final_fc_dim=512, num_attn_heads=8, separate_qa=False, l2=1e-5, emb_type="qid", emb_path="", pretrain_dim=768,alpha = 0.001,method="variance",enable=1):
         super().__init__()
         """
         Input:
@@ -30,6 +30,7 @@ class AKTB(nn.Module):
         self.n_question = n_question
         self.dropout = dropout
         self.kq_same = kq_same
+        self.alpha = alpha
         self.n_pid = n_pid
         self.l2 = l2
         self.model_type = self.model_name

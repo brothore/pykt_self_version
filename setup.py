@@ -25,3 +25,4 @@ setup(
     include_package_data=True,
     install_requires=['numpy>=1.17.2','pandas>=1.1.5','scikit-learn','torch>=1.7.0','wandb>=0.12.9','entmax'],
 )
+/root/autodl-tmp/configs

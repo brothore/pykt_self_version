@@ -532,8 +532,11 @@ def evaluate(model, test_loader, model_name, rel=None, save_path="", save_io_pat
             elif model_name == "saint":
                 y = model(cq.long(), cc.long(), r.long())
                 y = y[:, 1:]
-            elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt","atakt_dual","aktb"]:                                
+            elif model_name in ["atakt","atakt_dual"]:  
                 y, reg_loss,_ = model(cc.long(), cr.long(), cq.long())
+                y = y[:,1:]
+            elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt","atakt_dual","aktb"]:                                
+                y, reg_loss = model(cc.long(), cr.long(), cq.long())
                 y = y[:,1:]
             elif model_name in ["dtransformer"]:
                 output, *_ = model.predict(cc.long(), cr.long(), cq.long())
@@ -988,7 +991,10 @@ def evaluate_question(model, test_loader, model_name, fusion_type=["early_fusion
                 y = y[:,1:]
             elif model_name in ["rekt"]:
                 y, h = model(dcurori, qtest=True, train=False)
-            elif model_name in ["Transformer_Template","akt","extrakt", "folibikt","akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt","atakt_dual","aktb"]:
+            elif model_name in ["atakt","atakt_dual"]:
+                y, reg_loss, h,_ = model(cc.long(), cr.long(), cq.long(), True)
+                y = y[:,1:]
+            elif model_name in ["Transformer_Template","akt","extrakt", "folibikt","akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","aktb"]:
                 y, reg_loss, h,_ = model(cc.long(), cr.long(), cq.long(), True)
                 y = y[:,1:]
             elif model_name in ["dtransformer"]:

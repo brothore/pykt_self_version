@@ -10,6 +10,7 @@ dist/
 *.egg-info/
 *.pyc
 *.pkl
+pykt.zip
 data/
 saved_model
 build/
