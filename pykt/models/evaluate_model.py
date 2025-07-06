@@ -3,13 +3,117 @@ import torch
 from torch import nn
 from torch.nn.functional import one_hot
 from sklearn import metrics
-from pykt.config import que_type_models,SAVE_RESULT,STD_OUTPUT
+from pykt.config import que_type_models,SAVE_RESULT,STD_OUTPUT,RETURN_EVAL_LOSS
 from ..datasets.lpkt_utils import generate_time2idx
 import pandas as pd
 import csv
 USE_EARLY = 0
 TCN_ABQR = 0
 device = "cpu" if not torch.cuda.is_available() else "cuda"
+def cal_loss(model, ys, r, rshft, sm, preloss=[]):
+    model_name = model.model_name
+    
+    # 定义 Focal Loss 函数
+    def focal_loss(y_pred, y_true, alpha=0.25, gamma=2.0, reduction='mean'):
+        """
+        Focal Loss 实现
+        y_pred: 模型输出的概率 [N]
+        y_true: 真实标签 [N]
+        alpha: 类别平衡权重
+        gamma: 聚焦参数
+        reduction: 损失聚合方式 ('mean', 'sum', 'none')
+        """
+        bce_loss = F.binary_cross_entropy(y_pred, y_true, reduction='none')
+        
+        # 计算 p_t = p if y=1 else 1-p
+        p_t = torch.where(y_true == 1, y_pred, 1 - y_pred)
+        
+        # 计算调制因子 (1 - p_t)^gamma
+        focal_term = (1 - p_t) ** gamma
+        
+        # 应用类别平衡权重 alpha_t
+        alpha_t = torch.where(y_true == 1, alpha, 1 - alpha)
+        loss = alpha_t * focal_term * bce_loss
+        
+        if reduction == 'mean':
+            return loss.mean()
+        elif reduction == 'sum':
+            return loss.sum()
+        return loss
+    
+    # 根据全局变量选择损失函数
+    if FOCAL_LOSS:
+        loss_fn = focal_loss
+        # print("Using Focal Loss!")
+    else:
+        loss_fn = F.binary_cross_entropy
+        # print("Using Binary Cross-Entropy Loss!")
+
+    if model_name in ["atdkt", "simplekt", "stablekt", "bakt_time", "sparsekt"]:
+        y = torch.masked_select(ys[0], sm)
+        t = torch.masked_select(rshft, sm)
+        loss1 = loss_fn(y.double(), t.double())
+
+        if model.emb_type.find("predcurc") != -1:
+            if model.emb_type.find("his") != -1:
+                loss = model.l1*loss1+model.l2*ys[1]+model.l3*ys[2]
+            else:
+                loss = model.l1*loss1+model.l2*ys[1]
+        elif model.emb_type.find("predhis") != -1:
+            loss = model.l1*loss1+model.l2*ys[1]
+        else:
+            loss = loss1
+            
+    elif model_name in ["rekt"]:
+        t = torch.masked_select(rshft, sm)
+        loss = loss_fn(y.double(), t.double())
+
+    elif model_name in ["rkt","dimkt","LSTM_Template","CTNKT","dkt", "dkt_forget", "dkvmn","deep_irt", "kqn", "sakt", "saint", "atkt", "atktfix", "gkt", "skvmn", "hawkes"]:
+        y = torch.masked_select(ys[0], sm)
+        t = torch.masked_select(rshft, sm)
+        loss = loss_fn(y.double(), t.double())
+        
+    elif model_name in ["TCN_ABQR"]:
+        y = torch.masked_select(ys[0], sm)
+        t = torch.masked_select(rshft, sm)
+        loss = loss_fn(y.double(), t.double())
+        
+    elif model_name == "dkt+":
+        y_curr = torch.masked_select(ys[1], sm)
+        y_next = torch.masked_select(ys[0], sm)
+        r_curr = torch.masked_select(r, sm)
+        r_next = torch.masked_select(rshft, sm)
+        
+        # 对两个损失都使用 Focal Loss
+        loss = loss_fn(y_next.double(), r_next.double())
+        loss_r = loss_fn(y_curr.double(), r_curr.double())
+        
+        loss_w1 = torch.masked_select(torch.norm(ys[2][:, 1:] - ys[2][:, :-1], p=1, dim=-1), sm[:, 1:])
+        loss_w1 = loss_w1.mean() / model.num_c
+        loss_w2 = torch.masked_select(torch.norm(ys[2][:, 1:] - ys[2][:, :-1], p=2, dim=-1) ** 2, sm[:, 1:])
+        loss_w2 = loss_w2.mean() / model.num_c
+
+        loss = loss + model.lambda_r * loss_r + model.lambda_w1 * loss_w1 + model.lambda_w2 * loss_w2
+        
+    elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","dtransformer","BERT","atakt","atakt_dual","aktb"]:
+        y = torch.masked_select(ys[0], sm)
+        t = torch.masked_select(rshft, sm)
+        loss = loss_fn(y.double(), t.double()) + preloss[0]
+        
+    elif model_name == "lpkt":
+        y = torch.masked_select(ys[0], sm)
+        t = torch.masked_select(rshft, sm)
+        
+        if FOCAL_LOSS:
+            # 对于 LPKT，使用自定义的 reduction
+            criterion = lambda y_pred, y_true: focal_loss(y_pred, y_true, reduction='sum')
+        else:
+            criterion = nn.BCELoss(reduction='none')
+            
+        loss = criterion(y, t).sum() if not FOCAL_LOSS else criterion(y, t)
+    
+    return loss
+
 if TCN_ABQR:
     pre_load_gcn = "/share/disk/hzb/dataset/assistment2009/ques_skill_gcn_adj.pt"
     matrix = torch.load(pre_load_gcn).to(device)
@@ -354,6 +458,7 @@ def save_cur_predict_result(dres, q, r, d, t, m, sm, p):
 #     return auc, acc
 def evaluate(model, test_loader, model_name, rel=None, save_path="", save_io_path=""):
     std_output = STD_OUTPUT
+    return_eval_loss = RETURN_EVAL_LOSS
     # 准备存储输入输出数据的列表
     all_inputs = []
     all_outputs = []
@@ -427,7 +532,7 @@ def evaluate(model, test_loader, model_name, rel=None, save_path="", save_io_pat
             elif model_name == "saint":
                 y = model(cq.long(), cc.long(), r.long())
                 y = y[:, 1:]
-            elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt"]:                                
+            elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt","atakt_dual","aktb"]:                                
                 y, reg_loss,_ = model(cc.long(), cr.long(), cq.long())
                 y = y[:,1:]
             elif model_name in ["dtransformer"]:
@@ -633,7 +738,7 @@ def early_fusion(curhs, model, model_name):
         que_diff = model.diff_layer(curhs[1])#equ 13
         p = torch.sigmoid(3.0*stu_ability-que_diff)#equ 14
         p = p.squeeze(-1)
-    elif model_name in ["Transformer_Template","akt","extrakt", "folibikt","dtransformer","simplekt","stablekt", "bakt_time", "sparsekt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt"]:
+    elif model_name in ["Transformer_Template","akt","extrakt", "folibikt","dtransformer","simplekt","stablekt", "bakt_time", "sparsekt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt","atakt_dual","aktb"]:
         output = model.out(curhs[0]).squeeze(-1)
         m = nn.Sigmoid()
         p = m(output)
@@ -679,7 +784,7 @@ def effective_fusion(df, model, model_name, fusion_type):
 
     curhs, curr = [[], []], []
     dcur = {"late_trues": [], "qidxs": [], "questions": [], "concepts": [], "row": [], "concept_preds": []}
-    hasearly = ["dkvmn","deep_irt", "skvmn", "kqn","Transformer_Template", "akt","extrakt", "folibikt", "dtransformer", "simplekt","stablekt", "bakt_time", "sparsekt", "saint", "sakt", "hawkes", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx", "lpkt","BERT","atakt"]
+    hasearly = ["dkvmn","deep_irt", "skvmn", "kqn","Transformer_Template", "akt","extrakt", "folibikt", "dtransformer", "simplekt","stablekt", "bakt_time", "sparsekt", "saint", "sakt", "hawkes", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx", "lpkt","BERT","atakt","atakt_dual","aktb"]
     for ui in df:
         # 一题一题处理
         curdf = ui[1]
@@ -727,7 +832,7 @@ def group_fusion(dmerge, model, model_name, fusion_type, fout):
     if cq.shape[1] == 0:
         cq = cc
 
-    hasearly = ["dkvmn","deep_irt", "skvmn", "kqn", "dtransformer","Transformer_Template", "akt","extrakt", "folibikt","simplekt","stablekt", "bakt_time", "sparsekt", "saint", "sakt", "hawkes", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx", "lpkt","BERT","atakt"]
+    hasearly = ["dkvmn","deep_irt", "skvmn", "kqn", "dtransformer","Transformer_Template", "akt","extrakt", "folibikt","simplekt","stablekt", "bakt_time", "sparsekt", "saint", "sakt", "hawkes", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx", "lpkt","BERT","atakt","atakt_dual","aktb"]
     
     alldfs, drest = [], dict() # not predict infos!
     # print(f"real bz in group fusion: {rs.shape[0]}")
@@ -824,7 +929,7 @@ def evaluate_question(model, test_loader, model_name, fusion_type=["early_fusion
     # dkvmn / akt / saint: give cur -> predict cur
     # sakt: give past+cur -> predict cur
     # kqn: give past+cur -> predict cur
-    hasearly = ["dkvmn","deep_irt", "skvmn", "kqn", "dtransformer","Transformer_Template", "akt","extrakt","folibikt", "simplekt","stablekt", "bakt_time", "sparsekt", "saint", "sakt", "hawkes", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx", "lpkt","BERT","atakt"]
+    hasearly = ["dkvmn","deep_irt", "skvmn", "kqn", "dtransformer","Transformer_Template", "akt","extrakt","folibikt", "simplekt","stablekt", "bakt_time", "sparsekt", "saint", "sakt", "hawkes", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx", "lpkt","BERT","atakt","atakt_dual","aktb"]
     if save_path != "":
         fout = open(save_path, "w", encoding="utf8")
         if model_name in hasearly and USE_EARLY:
@@ -883,7 +988,7 @@ def evaluate_question(model, test_loader, model_name, fusion_type=["early_fusion
                 y = y[:,1:]
             elif model_name in ["rekt"]:
                 y, h = model(dcurori, qtest=True, train=False)
-            elif model_name in ["Transformer_Template","akt","extrakt", "folibikt","akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt"]:
+            elif model_name in ["Transformer_Template","akt","extrakt", "folibikt","akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt","atakt_dual","aktb"]:
                 y, reg_loss, h,_ = model(cc.long(), cr.long(), cq.long(), True)
                 y = y[:,1:]
             elif model_name in ["dtransformer"]:
@@ -1419,7 +1524,7 @@ def predict_each_group(dtotal, dcur, dforget, curdforget, is_repeat, qidx, uid, 
             # 应该用预测的r更新memory value，但是这里一个知识点一个知识点预测，所以curr不起作用！
             y = model(cin.long(), rin.long())
             pred = y[0][-1]
-        elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt"]:  
+        elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt","atakt_dual","aktb"]:  
             #### 输入有question！     
             if qout != None:
                 curq = torch.tensor([[qout.item()]]).to(device)
@@ -1803,7 +1908,7 @@ def predict_each_group2(dtotal, dcur, dforget, curdforget, is_repeat, qidx, uid,
         elif model_name == "saint":
             y = model(ccq.long(), ccc.long(), curr.long())
             y = y[:, 1:]
-        elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "cakt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt"]:                                
+        elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "cakt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","atakt","atakt_dual","aktb"]:                                
             y, reg_loss,_ = model(ccc.long(), ccr.long(), ccq.long())
             y = y[:,1:]
         elif model_name in ["dtransformer"]:

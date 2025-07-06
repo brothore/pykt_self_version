@@ -12,8 +12,10 @@ from .kqn import KQN
 from .atkt import ATKT
 from .dkt_forget import DKTForget
 from .akt import AKT
+from .aktb import AKTB
 from .Transformer_Template import Transformer_Template
 from .atakt import ATAKT
+from .atakt_dual import ATAKT_DUAL
 from .BERT import BERT
 from .gkt import GKT
 from .gkt_utils import get_gkt_graph
@@ -70,8 +72,12 @@ def init_model(model_name, model_config, data_config, emb_type):
         model = Transformer_Template(data_config["num_c"], data_config["num_q"], **model_config, emb_type=emb_type, emb_path=data_config["emb_path"]).to(device)
     elif model_name == "atakt":
         model = ATAKT(data_config["num_c"], data_config["num_q"], **model_config, emb_type=emb_type, emb_path=data_config["emb_path"]).to(device)
+    elif model_name == "atakt_dual":
+        model = ATAKT_DUAL(data_config["num_c"], data_config["num_q"], **model_config, emb_type=emb_type, emb_path=data_config["emb_path"]).to(device)
     elif model_name == "BERT":
         model = BERT(data_config["num_c"], data_config["num_q"], **model_config, emb_type=emb_type, emb_path=data_config["emb_path"]).to(device)
+    elif model_name == "aktb":
+        model = AKTB(data_config["num_c"], data_config["num_q"], **model_config, emb_type=emb_type, emb_path=data_config["emb_path"]).to(device)
     elif model_name == "extrakt":
         model = extraKT(data_config["num_c"], data_config["num_q"], **model_config, emb_type=emb_type, emb_path=data_config["emb_path"]).to(device)
     elif model_name == "folibikt":

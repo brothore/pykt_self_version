@@ -14,9 +14,9 @@ class Dim(IntEnum):
     seq = 1
     feature = 2
 
-class ATAKT(nn.Module):
+class AKTB(nn.Module):
     def __init__(self, n_question, n_pid, d_model, n_blocks, dropout, d_ff=256, 
-            kq_same=1, final_fc_dim=512, num_attn_heads=8, separate_qa=False, l2=1e-5, emb_type="qid", emb_path="", pretrain_dim=768, epsilon=10, beta=0.2,pert_type=""):
+            kq_same=1, final_fc_dim=512, num_attn_heads=8, separate_qa=False, l2=1e-5, emb_type="qid", emb_path="", pretrain_dim=768):
         super().__init__()
         """
         Input:
@@ -26,16 +26,12 @@ class ATAKT(nn.Module):
             d_ff : dimension for fully conntected net inside the basic block
             kq_same: if key query same, kq_same=1, else = 0
         """
-        self.epsilon = epsilon
-        self.beta = beta
-
-        self.model_name = "atakt"
+        self.model_name = "Transformer_Template"
         self.n_question = n_question
         self.dropout = dropout
         self.kq_same = kq_same
         self.n_pid = n_pid
         self.l2 = l2
-        self.pert_type = pert_type
         self.model_type = self.model_name
         self.separate_qa = separate_qa
         self.emb_type = emb_type
@@ -80,43 +76,13 @@ class ATAKT(nn.Module):
             # BS, seqlen, d_model # c_ct+ g_rt =e_(ct,rt)
             qa_embed_data = self.qa_embed(target)+q_embed_data
         return q_embed_data, qa_embed_data
-    def base_emb_pert(self, q_data, target,perturbation=None):
-        q_embed_data = self.q_embed(q_data) 
-        pert = q_embed_data
-        if perturbation is None:
 
-            q_embed_data = q_embed_data
-        else:
-            q_embed_data = q_embed_data+perturbation
-        
-        if self.separate_qa:
-            qa_data = q_data + self.n_question * target
-            qa_embed_data = self.qa_embed(qa_data)
-        else:
-            # BS, seqlen, d_model # c_ct+ g_rt =e_(ct,rt)
-            qa_embed_data = self.qa_embed(target)+q_embed_data
-        return q_embed_data, qa_embed_data,pert
-    def forward(self, q_data, target, pid_data=None, qtest=False, perturbation=None):
+    def forward(self, q_data, target, pid_data=None, qtest=False):
         emb_type = self.emb_type
         # Batch First
-        if emb_type.startswith("qid") and self.pert_type != "q+qa_t":
+        if emb_type.startswith("qid"):
             q_embed_data, qa_embed_data = self.base_emb(q_data, target)
-        elif emb_type.startswith("qid") and self.pert_type == "q+qa_t":
-            if perturbation is not None:
-                q_embed_data, qa_embed_data,pert = self.base_emb_pert(q_data, target,perturbation)
-            else:
-                q_embed_data, qa_embed_data,pert = self.base_emb_pert(q_data, target)
-        if self.pert_type == "qa":
-            # print(f"self.pert_type:qa")
-            pert = qa_embed_data
-            if perturbation is not None:
-                qa_embed_data += perturbation
-        elif self.pert_type == "q":
-            # print(f"self.pert_type:q")
 
-            pert = q_embed_data
-            if perturbation is not None:
-                q_embed_data += perturbation
         pid_embed_data = None
         if self.n_pid > 0: # have problem id
             q_embed_diff_data = self.q_embed_diff(q_data)  # d_ct 总结了包含当前question（concept）的problems（questions）的变化
@@ -135,31 +101,10 @@ class ATAKT(nn.Module):
             c_reg_loss = (pid_embed_data ** 2.).sum() * self.l2 # rasch部分loss
         else:
             c_reg_loss = 0.
-        if self.pert_type == "rasch_qa":
-            # print(f"self.pert_type:rasch_qa")
 
-            pert = qa_embed_data
-            if perturbation is not None:
-                qa_embed_data += perturbation
-        elif self.pert_type == "rasch_q":
-            # print(f"self.pert_type:rasch_q")
-
-            pert = q_embed_data
-            if perturbation is not None:
-                q_embed_data += perturbation
-        elif self.pert_type == "rasch_pid":
-            # print(f"self.pert_type:rasch_pid")
-
-            pert = pid_embed_data
-            if perturbation is not None:
-                pid_embed_data += perturbation
         # BS.seqlen,d_model
         # Pass to the decoder
         # output shape BS,seqlen,d_model or d_model//2
-
-
-
-        
         d_output = self.model(q_embed_data, qa_embed_data, pid_embed_data)
 
         concat_q = torch.cat([d_output, q_embed_data], dim=-1)
@@ -167,9 +112,9 @@ class ATAKT(nn.Module):
         m = nn.Sigmoid()
         preds = m(output)
         if not qtest:
-            return preds, c_reg_loss,pert
+            return preds, c_reg_loss
         else:
-            return preds, c_reg_loss, concat_q,pert
+            return preds, c_reg_loss, concat_q
 
 
 class Architecture(nn.Module):
@@ -185,7 +130,7 @@ class Architecture(nn.Module):
         self.d_model = d_model
         self.model_type = model_type
 
-        if model_type in {'atakt'}:
+        if model_type in {'Transformer_Template'}:
             self.blocks_1 = nn.ModuleList([
                 TransformerLayer(d_model=d_model, d_feature=d_model // n_heads,
                                  d_ff=d_ff, dropout=dropout, n_heads=n_heads, kq_same=kq_same, emb_type=emb_type)

@@ -36,6 +36,93 @@ from itertools import zip_longest
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ii = 0
 TCN_ABQR = 0
+import torch
+import torch.nn.functional as F
+from torch.autograd import Variable, grad
+def fairness_regularization(predictions, student_ids, alpha=0.1, method='variance'):
+    """
+    公平性正则化项，减少不同学生之间的预测差异
+    
+    Args:
+        predictions: 模型预测值 [batch_size, seq_len] (logits)
+        student_ids: 学生ID [batch_size]
+        alpha: 正则化强度
+        method: 正则化方法 ('variance', 'mmd', 'entropy')
+    
+    Returns:
+        fairness_loss: 公平性损失
+    """
+    device = predictions.device
+    unique_students = torch.unique(student_ids)
+    
+    if len(unique_students) < 2:
+        return torch.tensor(0.0, device=device)
+    
+    if method == 'variance':
+        # 方法1: 最小化不同学生平均预测概率的方差
+        student_avg_preds = []
+        for student_id in unique_students:
+            student_mask = (student_ids == student_id)
+            if student_mask.sum() > 0:
+                # 计算该学生的平均预测概率
+                student_preds = predictions[student_mask]
+                avg_pred = torch.sigmoid(student_preds).mean()
+                student_avg_preds.append(avg_pred)
+        
+        if len(student_avg_preds) > 1:
+            student_avg_preds = torch.stack(student_avg_preds)
+            # 计算方差作为公平性损失
+            fairness_loss = torch.var(student_avg_preds)
+            return alpha * fairness_loss
+            
+    elif method == 'mmd':
+        # 方法2: 使用Maximum Mean Discrepancy (MMD)
+        total_mmd = 0.0
+        count = 0
+        
+        for i, student_i in enumerate(unique_students):
+            for j, student_j in enumerate(unique_students):
+                if i >= j:
+                    continue
+                    
+                mask_i = (student_ids == student_i)
+                mask_j = (student_ids == student_j)
+                
+                if mask_i.sum() > 0 and mask_j.sum() > 0:
+                    preds_i = torch.sigmoid(predictions[mask_i]).flatten()
+                    preds_j = torch.sigmoid(predictions[mask_j]).flatten()
+                    
+                    # 简化的MMD计算
+                    mean_i = preds_i.mean()
+                    mean_j = preds_j.mean()
+                    mmd = (mean_i - mean_j) ** 2
+                    total_mmd += mmd
+                    count += 1
+        
+        if count > 0:
+            return alpha * (total_mmd / count)
+            
+    elif method == 'entropy':
+        # 方法3: 基于熵的公平性损失
+        student_entropies = []
+        for student_id in unique_students:
+            student_mask = (student_ids == student_id)
+            if student_mask.sum() > 0:
+                student_preds = torch.sigmoid(predictions[student_mask])
+                # 计算该学生预测的熵
+                entropy = -torch.mean(
+                    student_preds * torch.log(student_preds + 1e-8) + 
+                    (1 - student_preds) * torch.log(1 - student_preds + 1e-8)
+                )
+                student_entropies.append(entropy)
+        
+        if len(student_entropies) > 1:
+            student_entropies = torch.stack(student_entropies)
+            # 最小化不同学生间熵的方差
+            fairness_loss = torch.var(student_entropies)
+            return alpha * fairness_loss
+    
+    return torch.tensor(0.0, device=device)
 
 def fast_embedding_smote(minority_embeddings, minority_labels, minority_cshfts,
                         target_count, random_state=42, 
@@ -1716,7 +1803,7 @@ def cal_loss(model, ys, r, rshft, sm, preloss=[]):
 
         loss = loss + model.lambda_r * loss_r + model.lambda_w1 * loss_w1 + model.lambda_w2 * loss_w2
         
-    elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","dtransformer","BERT","atakt"]:
+    elif model_name in ["Transformer_Template","akt","extrakt","folibikt", "akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","dtransformer","BERT","atakt","atakt_dual","aktb"]:
         y = torch.masked_select(ys[0], sm)
         t = torch.masked_select(rshft, sm)
         loss = loss_fn(y.double(), t.double()) + preloss[0]
@@ -1755,7 +1842,7 @@ def model_forward(model, data, opt=None, rel=None,model_config={},data_label=0):
         q, c, r, t = dcur["qseqs"].to(device), dcur["cseqs"].to(device), dcur["rseqs"].to(device), dcur["tseqs"].to(device)
         qshft, cshft, rshft, tshft = dcur["shft_qseqs"].to(device), dcur["shft_cseqs"].to(device), dcur["shft_rseqs"].to(device), dcur["shft_tseqs"].to(device)
     m, sm = dcur["masks"].to(device), dcur["smasks"].to(device)
-
+    uids = dcur["uids"].to(device)
     ys, preloss = [], []
     cq = torch.cat((q[:,0:1], qshft), dim=1)
     cc = torch.cat((c[:,0:1], cshft), dim=1)
@@ -1923,8 +2010,46 @@ def model_forward(model, data, opt=None, rel=None,model_config={},data_label=0):
         y, reg_loss = model(cc.long(), cr.long(), cq.long())
         ys.append(y[:,1:])
         preloss.append(reg_loss)
+    elif model_name in ["aktb"]:
+        y, reg_loss = model(cc.long(), cr.long(), cq.long())
+        y_pred = y[:,1:]  # 预测输出
+        ys.append(y_pred)
+        preloss.append(reg_loss)
+        fairness_config = model_config.get('fairness', {})
+        fairness_alpha = fairness_config.get('alpha', 0.01)  # 公平性正则化强度
+        fairness_method = fairness_config.get('method', 'variance')  # 正则化方法
+        enable_fairness = fairness_config.get('enable', True)  # 是否启用公平性正则化
+        
+        if enable_fairness:
+            # 计算公平性损失并直接加到reg_loss中
+            fairness_loss = fairness_regularization(
+                y_pred, uids, alpha=fairness_alpha, method=fairness_method
+            )
+            # 将公平性损失加到原有的正则化损失中
+            total_reg_loss = reg_loss + fairness_loss
+            
+            # 可选：打印公平性损失用于监控
+            if ii % 100 == 0:  # 每100个batch打印一次
+                print(f"Batch {ii}: Reg Loss = {reg_loss.item():.6f}, Fairness Loss = {fairness_loss.item():.6f}")
+        else:
+            total_reg_loss = reg_loss
+
 
     elif model_name in ["atakt"]: 
+
+        y, features = model(cc.long(), cr.long(), cq.long())
+        y = y[:,1:]
+        loss = cal_loss(model, [y], r, rshft, sm)
+        # at
+        features_grad = grad(loss, features, retain_graph=True)
+        p_adv = torch.FloatTensor(model.epsilon * _l2_normalize_adv(features_grad[0].data))
+        p_adv = Variable(p_adv).to(device)
+        pred_res, _ = model(cc.long(), cr.long(), cq.long(), perturbation=p_adv)
+        # second loss
+        pred_res = pred_res[:,1:]
+        adv_loss = cal_loss(model, [pred_res], r, rshft, sm)
+        loss = loss + model.beta * adv_loss
+    elif model_name in ["atakt_dual"]: 
 
         y, features = model(cc.long(), cr.long(), cq.long())
         y = y[:,1:]

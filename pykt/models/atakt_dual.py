@@ -14,7 +14,7 @@ class Dim(IntEnum):
     seq = 1
     feature = 2
 
-class ATAKT(nn.Module):
+class ATAKT_DUAL(nn.Module):
     def __init__(self, n_question, n_pid, d_model, n_blocks, dropout, d_ff=256, 
             kq_same=1, final_fc_dim=512, num_attn_heads=8, separate_qa=False, l2=1e-5, emb_type="qid", emb_path="", pretrain_dim=768, epsilon=10, beta=0.2,pert_type=""):
         super().__init__()
@@ -28,7 +28,6 @@ class ATAKT(nn.Module):
         """
         self.epsilon = epsilon
         self.beta = beta
-
         self.model_name = "atakt"
         self.n_question = n_question
         self.dropout = dropout
@@ -80,32 +79,12 @@ class ATAKT(nn.Module):
             # BS, seqlen, d_model # c_ct+ g_rt =e_(ct,rt)
             qa_embed_data = self.qa_embed(target)+q_embed_data
         return q_embed_data, qa_embed_data
-    def base_emb_pert(self, q_data, target,perturbation=None):
-        q_embed_data = self.q_embed(q_data) 
-        pert = q_embed_data
-        if perturbation is None:
 
-            q_embed_data = q_embed_data
-        else:
-            q_embed_data = q_embed_data+perturbation
-        
-        if self.separate_qa:
-            qa_data = q_data + self.n_question * target
-            qa_embed_data = self.qa_embed(qa_data)
-        else:
-            # BS, seqlen, d_model # c_ct+ g_rt =e_(ct,rt)
-            qa_embed_data = self.qa_embed(target)+q_embed_data
-        return q_embed_data, qa_embed_data,pert
     def forward(self, q_data, target, pid_data=None, qtest=False, perturbation=None):
         emb_type = self.emb_type
         # Batch First
-        if emb_type.startswith("qid") and self.pert_type != "q+qa_t":
+        if emb_type.startswith("qid"):
             q_embed_data, qa_embed_data = self.base_emb(q_data, target)
-        elif emb_type.startswith("qid") and self.pert_type == "q+qa_t":
-            if perturbation is not None:
-                q_embed_data, qa_embed_data,pert = self.base_emb_pert(q_data, target,perturbation)
-            else:
-                q_embed_data, qa_embed_data,pert = self.base_emb_pert(q_data, target)
         if self.pert_type == "qa":
             # print(f"self.pert_type:qa")
             pert = qa_embed_data
