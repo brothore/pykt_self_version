@@ -220,11 +220,91 @@ def evaluate_single_student(params, student_id):
     return dres
 
 
+# def main(params):
+#     """主函数，循环评估所有学生"""
+#     total_students = params.get('total_students', 770)
+#     start_student = params.get('start_student', 1)
+#     save_dir = params["save_dir"]
+    
+#     # 存储所有学生的评估结果
+#     all_results = []
+    
+#     print(f"开始批量评估，共 {total_students} 个学生，从学生 {start_student} 开始")
+    
+#     for student_id in range(start_student, total_students + 1):
+
+#         # 评估单个学生
+#         result = evaluate_single_student(params, student_id)
+#         all_results.append(result)
+        
+#         print(f"完成学生 {student_id} 的评估 ({student_id - start_student + 1}/{total_students - start_student + 1})")
+            
+
+    
+#     # 将所有结果转换为DataFrame并保存为CSV
+#     if all_results:
+#         df = pd.DataFrame(all_results)
+        
+#         # 生成CSV文件路径
+#         csv_path = os.path.join(save_dir, "batch_evaluation_results.csv")
+        
+#         try:
+#             df.to_csv(csv_path, index=False, encoding='utf-8-sig')
+#             print(f"\n所有评估结果已保存到 CSV 文件: {csv_path}")
+            
+#             # 输出统计信息
+#             print(f"\n评估完成统计:")
+#             print(f"总计评估学生数: {len(all_results)}")
+            
+#             # 计算统计列的基本统计信息
+#             stat_columns = [
+#                 'total_questions', 'avg_questions_per_concept', 'max_questions_per_concept',
+#                 'min_questions_per_concept', 'questions_range', 'overall_accuracy',
+#                 'accuracy_range', 'accuracy_variance', 'max_accuracy', 'min_accuracy'
+#             ]
+            
+#             for col in stat_columns:
+#                 if col in df.columns:
+#                     valid_data = df[col][df[col] >= 0]  # 只取有效值
+#                     if not valid_data.empty:
+#                         print(f"\n{col}统计:")
+#                         print(f"  最小值: {valid_data.min():.2f}")
+#                         print(f"  最大值: {valid_data.max():.2f}")
+#                         print(f"  平均值: {valid_data.mean():.2f}")
+#                         print(f"  标准差: {valid_data.std():.2f}")
+            
+#             # 如果有windowauclate_mean和windowacclate_mean字段，计算统计信息
+#             if 'windowauclate_mean' in df.columns:
+#                 valid_windowauc = df['windowauclate_mean'][df['windowauclate_mean'] != -1]
+#                 if len(valid_windowauc) > 0:
+#                     print(f"\nwindowauclate_mean统计:")
+#                     print(f"  最小值: {valid_windowauc.min():.6f}")
+#                     print(f"  最大值: {valid_windowauc.max():.6f}")
+#                     print(f"  平均值: {valid_windowauc.mean():.6f}")
+#                     print(f"  标准差: {valid_windowauc.std():.6f}")
+            
+#             if 'windowacclate_mean' in df.columns:
+#                 valid_windowacc = df['windowacclate_mean'][df['windowacclate_mean'] != -1]
+#                 if len(valid_windowacc) > 0:
+#                     print(f"\nwindowacclate_mean统计:")
+#                     print(f"  最小值: {valid_windowacc.min():.6f}")
+#                     print(f"  最大值: {valid_windowacc.max():.6f}")
+#                     print(f"  平均值: {valid_windowacc.mean():.6f}")
+#                     print(f"  标准差: {valid_windowacc.std():.6f}")
+                    
+#         except Exception as e:
+#             print(f"保存CSV文件时出错: {e}")
+#     else:
+#         print("警告：没有收集到任何评估结果")
+
 def main(params):
     """主函数，循环评估所有学生"""
     total_students = params.get('total_students', 770)
     start_student = params.get('start_student', 1)
     save_dir = params["save_dir"]
+    
+    # 创建统计文件路径
+    stat_file_path = os.path.join(save_dir, "evaluation_statistics.txt")
     
     # 存储所有学生的评估结果
     all_results = []
@@ -232,14 +312,10 @@ def main(params):
     print(f"开始批量评估，共 {total_students} 个学生，从学生 {start_student} 开始")
     
     for student_id in range(start_student, total_students + 1):
-
         # 评估单个学生
         result = evaluate_single_student(params, student_id)
         all_results.append(result)
-        
         print(f"完成学生 {student_id} 的评估 ({student_id - start_student + 1}/{total_students - start_student + 1})")
-            
-
     
     # 将所有结果转换为DataFrame并保存为CSV
     if all_results:
@@ -252,52 +328,84 @@ def main(params):
             df.to_csv(csv_path, index=False, encoding='utf-8-sig')
             print(f"\n所有评估结果已保存到 CSV 文件: {csv_path}")
             
-            # 输出统计信息
-            print(f"\n评估完成统计:")
-            print(f"总计评估学生数: {len(all_results)}")
+            # 打开统计文件进行写入
+            with open(stat_file_path, 'w', encoding='utf-8') as stat_file:
+                # 写入CSV文件信息
+                stat_file.write(f"所有评估结果已保存到 CSV 文件: {csv_path}\n")
+                
+                # 写入评估统计摘要
+                stat_file.write("\n评估完成统计:\n")
+                stat_file.write(f"总计评估学生数: {len(all_results)}\n")
+                
+                # 计算并写入各统计列的基本统计信息
+                stat_columns = [
+                    'total_questions', 'avg_questions_per_concept', 'max_questions_per_concept',
+                    'min_questions_per_concept', 'questions_range', 'overall_accuracy',
+                    'accuracy_range', 'accuracy_variance', 'max_accuracy', 'min_accuracy'
+                ]
+                
+                for col in stat_columns:
+                    if col in df.columns:
+                        valid_data = df[col][df[col] >= 0]  # 只取有效值
+                        if not valid_data.empty:
+                            # 控制台输出
+                            print(f"\n{col}统计:")
+                            print(f"  最小值: {valid_data.min():.2f}")
+                            print(f"  最大值: {valid_data.max():.2f}")
+                            print(f"  平均值: {valid_data.mean():.2f}")
+                            print(f"  标准差: {valid_data.std():.2f}")
+                            
+                            # 文件输出
+                            stat_file.write(f"\n{col}统计:\n")
+                            stat_file.write(f"  最小值: {valid_data.min():.2f}\n")
+                            stat_file.write(f"  最大值: {valid_data.max():.2f}\n")
+                            stat_file.write(f"  平均值: {valid_data.mean():.2f}\n")
+                            stat_file.write(f"  标准差: {valid_data.std():.2f}\n")
+                
+                # 处理windowauclate_mean统计
+                if 'windowauclate_mean' in df.columns:
+                    valid_windowauc = df['windowauclate_mean'][df['windowauclate_mean'] != -1]
+                    if len(valid_windowauc) > 0:
+                        # 控制台输出
+                        print(f"\nwindowauclate_mean统计:")
+                        print(f"  最小值: {valid_windowauc.min():.6f}")
+                        print(f"  最大值: {valid_windowauc.max():.6f}")
+                        print(f"  平均值: {valid_windowauc.mean():.6f}")
+                        print(f"  标准差: {valid_windowauc.std():.6f}")
+                        
+                        # 文件输出
+                        stat_file.write(f"\nwindowauclate_mean统计:\n")
+                        stat_file.write(f"  最小值: {valid_windowauc.min():.6f}\n")
+                        stat_file.write(f"  最大值: {valid_windowauc.max():.6f}\n")
+                        stat_file.write(f"  平均值: {valid_windowauc.mean():.6f}\n")
+                        stat_file.write(f"  标准差: {valid_windowauc.std():.6f}\n")
+                
+                # 处理windowacclate_mean统计
+                if 'windowacclate_mean' in df.columns:
+                    valid_windowacc = df['windowacclate_mean'][df['windowacclate_mean'] != -1]
+                    if len(valid_windowacc) > 0:
+                        # 控制台输出
+                        print(f"\nwindowacclate_mean统计:")
+                        print(f"  最小值: {valid_windowacc.min():.6f}")
+                        print(f"  最大值: {valid_windowacc.max():.6f}")
+                        print(f"  平均值: {valid_windowacc.mean():.6f}")
+                        print(f"  标准差: {valid_windowacc.std():.6f}")
+                        
+                        # 文件输出
+                        stat_file.write(f"\nwindowacclate_mean统计:\n")
+                        stat_file.write(f"  最小值: {valid_windowacc.min():.6f}\n")
+                        stat_file.write(f"  最大值: {valid_windowacc.max():.6f}\n")
+                        stat_file.write(f"  平均值: {valid_windowacc.mean():.6f}\n")
+                        stat_file.write(f"  标准差: {valid_windowacc.std():.6f}\n")
             
-            # 计算统计列的基本统计信息
-            stat_columns = [
-                'total_questions', 'avg_questions_per_concept', 'max_questions_per_concept',
-                'min_questions_per_concept', 'questions_range', 'overall_accuracy',
-                'accuracy_range', 'accuracy_variance', 'max_accuracy', 'min_accuracy'
-            ]
-            
-            for col in stat_columns:
-                if col in df.columns:
-                    valid_data = df[col][df[col] >= 0]  # 只取有效值
-                    if not valid_data.empty:
-                        print(f"\n{col}统计:")
-                        print(f"  最小值: {valid_data.min():.2f}")
-                        print(f"  最大值: {valid_data.max():.2f}")
-                        print(f"  平均值: {valid_data.mean():.2f}")
-                        print(f"  标准差: {valid_data.std():.2f}")
-            
-            # 如果有windowauclate_mean和windowacclate_mean字段，计算统计信息
-            if 'windowauclate_mean' in df.columns:
-                valid_windowauc = df['windowauclate_mean'][df['windowauclate_mean'] != -1]
-                if len(valid_windowauc) > 0:
-                    print(f"\nwindowauclate_mean统计:")
-                    print(f"  最小值: {valid_windowauc.min():.6f}")
-                    print(f"  最大值: {valid_windowauc.max():.6f}")
-                    print(f"  平均值: {valid_windowauc.mean():.6f}")
-                    print(f"  标准差: {valid_windowauc.std():.6f}")
-            
-            if 'windowacclate_mean' in df.columns:
-                valid_windowacc = df['windowacclate_mean'][df['windowacclate_mean'] != -1]
-                if len(valid_windowacc) > 0:
-                    print(f"\nwindowacclate_mean统计:")
-                    print(f"  最小值: {valid_windowacc.min():.6f}")
-                    print(f"  最大值: {valid_windowacc.max():.6f}")
-                    print(f"  平均值: {valid_windowacc.mean():.6f}")
-                    print(f"  标准差: {valid_windowacc.std():.6f}")
+            print(f"\n评估统计信息已保存到文件: {stat_file_path}")
                     
         except Exception as e:
-            print(f"保存CSV文件时出错: {e}")
+            print(f"保存结果时出错: {e}")
+            import traceback
+            traceback.print_exc()
     else:
         print("警告：没有收集到任何评估结果")
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--bz", type=int, default=256)

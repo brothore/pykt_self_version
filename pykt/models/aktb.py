@@ -26,11 +26,13 @@ class AKTB(nn.Module):
             d_ff : dimension for fully conntected net inside the basic block
             kq_same: if key query same, kq_same=1, else = 0
         """
-        self.model_name = "Transformer_Template"
+        self.model_name = "aktb"
         self.n_question = n_question
         self.dropout = dropout
         self.kq_same = kq_same
         self.alpha = alpha
+        self.method = method
+        self.enable = enable
         self.n_pid = n_pid
         self.l2 = l2
         self.model_type = self.model_name
@@ -131,7 +133,7 @@ class Architecture(nn.Module):
         self.d_model = d_model
         self.model_type = model_type
 
-        if model_type in {'Transformer_Template'}:
+        if model_type in {'aktb'}:
             self.blocks_1 = nn.ModuleList([
                 TransformerLayer(d_model=d_model, d_feature=d_model // n_heads,
                                  d_ff=d_ff, dropout=dropout, n_heads=n_heads, kq_same=kq_same, emb_type=emb_type)

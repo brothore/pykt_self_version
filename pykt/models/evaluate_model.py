@@ -995,8 +995,9 @@ def evaluate_question(model, test_loader, model_name, fusion_type=["early_fusion
                 y, reg_loss, h,_ = model(cc.long(), cr.long(), cq.long(), True)
                 y = y[:,1:]
             elif model_name in ["Transformer_Template","akt","extrakt", "folibikt","akt_vector", "akt_norasch", "akt_mono", "akt_attn", "aktattn_pos", "aktmono_pos", "akt_raschx", "akt_raschy", "aktvec_raschx","BERT","aktb"]:
-                y, reg_loss, h,_ = model(cc.long(), cr.long(), cq.long(), True)
+                y, reg_loss = model(cc.long(), cr.long(), cq.long())
                 y = y[:,1:]
+
             elif model_name in ["dtransformer"]:
                 output, h, *_ = model.predict(cc.long(), cr.long(), cq.long())
                 sg = nn.Sigmoid()

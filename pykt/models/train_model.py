@@ -46,6 +46,222 @@ from itertools import zip_longest
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ii = 0
 TCN_ABQR = 0
+
+def fairness_regularization(predictions, student_ids, alpha=0.1, method='variance', main_loss=None, true_labels=None, masks=None):
+    """
+    改进的公平性正则化项，满足深度学习正则化的核心要求
+    
+    Args:
+        predictions: 模型预测值 [batch_size, seq_len] (logits or probabilities)
+        student_ids: 学生ID [batch_size] 
+        alpha: 正则化强度
+        method: 正则化方法 ('variance', 'mmd', 'entropy', 'performance_gap')
+        main_loss: 主任务损失，用于自适应归一化
+        true_labels: 真实标签 [batch_size, seq_len]，用于performance_gap方法
+        masks: 有效位置掩码 [batch_size, seq_len]，用于performance_gap方法
+    
+    Returns:
+        fairness_loss: 归一化后的公平性损失
+    """
+    device = predictions.device
+    unique_students = torch.unique(student_ids)
+    
+    if len(unique_students) < 2:
+        return torch.tensor(0.0, device=device, requires_grad=True)
+    
+    # 数值稳定性常数
+    eps = 1e-8
+    
+    if method == 'variance':
+        # 改进方法1: 规模不变的方差正则化
+        student_avg_preds = []
+        student_weights = []  # 用于加权，处理样本数量不均
+        
+        for student_id in unique_students:
+            student_mask = (student_ids == student_id)
+            student_count = student_mask.sum()
+            
+            if student_count > 0:
+                # 计算该学生的平均预测概率
+                student_preds = predictions[student_mask]
+                avg_pred = torch.sigmoid(student_preds).mean()
+                student_avg_preds.append(avg_pred)
+                
+                # 样本权重：处理不同学生数据量不均的问题（规模不变性）
+                student_weights.append(torch.sqrt(student_count.float()))
+        
+        if len(student_avg_preds) > 1:
+            student_avg_preds = torch.stack(student_avg_preds)
+            student_weights = torch.stack(student_weights)
+            
+            # 加权方差计算，提高规模不变性
+            weights_normalized = student_weights / (student_weights.sum() + eps)
+            weighted_mean = (student_avg_preds * weights_normalized).sum()
+            weighted_var = ((student_avg_preds - weighted_mean) ** 2 * weights_normalized).sum()
+            
+            # 归一化处理：确保量级匹配
+            # 方差范围[0, 0.25]，归一化到合理范围
+            normalized_var = weighted_var / (0.25 + eps)  # 归一化到[0,1]范围
+            
+            # 根据学生数量进行进一步归一化（规模不变性）
+            num_students = len(unique_students)
+            scale_factor = torch.log(torch.tensor(num_students, dtype=torch.float, device=device) + 1)
+            
+            fairness_loss = alpha * normalized_var * scale_factor
+            return fairness_loss
+            
+    elif method == 'mmd':
+        # 改进方法2: 规模不变的MMD
+        total_mmd = 0.0
+        count = 0
+        
+        for i, student_i in enumerate(unique_students):
+            for j, student_j in enumerate(unique_students):
+                if i >= j:
+                    continue
+                    
+                mask_i = (student_ids == student_i)
+                mask_j = (student_ids == student_j)
+                
+                count_i = mask_i.sum()
+                count_j = mask_j.sum()
+                
+                if count_i > 0 and count_j > 0:
+                    preds_i = torch.sigmoid(predictions[mask_i]).flatten()
+                    preds_j = torch.sigmoid(predictions[mask_j]).flatten()
+                    
+                    # 规模不变的MMD计算
+                    mean_i = preds_i.mean()
+                    mean_j = preds_j.mean()
+                    
+                    # 考虑样本数量差异的权重
+                    weight = torch.sqrt((count_i * count_j).float()) / (count_i + count_j).float()
+                    mmd = weight * (mean_i - mean_j) ** 2
+                    total_mmd += mmd
+                    count += 1
+        
+        if count > 0:
+            # 归一化MMD
+            avg_mmd = total_mmd / count
+            # MMD范围[0, 1]，已经相对归一化
+            num_pairs = len(unique_students) * (len(unique_students) - 1) // 2
+            scale_factor = torch.log(torch.tensor(num_pairs, dtype=torch.float, device=device) + 1)
+            
+            fairness_loss = alpha * avg_mmd * scale_factor
+            return fairness_loss
+            
+    elif method == 'entropy':
+        # 改进方法3: 规模不变的熵正则化
+        student_entropies = []
+        student_weights = []
+        
+        for student_id in unique_students:
+            student_mask = (student_ids == student_id)
+            student_count = student_mask.sum()
+            
+            if student_count > 0:
+                student_preds = torch.sigmoid(predictions[student_mask])
+                # 计算该学生预测的熵
+                entropy = -torch.mean(
+                    student_preds * torch.log(student_preds + eps) + 
+                    (1 - student_preds) * torch.log(1 - student_preds + eps)
+                )
+                student_entropies.append(entropy)
+                student_weights.append(torch.sqrt(student_count.float()))
+        
+        if len(student_entropies) > 1:
+            student_entropies = torch.stack(student_entropies)
+            student_weights = torch.stack(student_weights)
+            
+            # 加权方差计算
+            weights_normalized = student_weights / (student_weights.sum() + eps)
+            weighted_mean = (student_entropies * weights_normalized).sum()
+            weighted_var = ((student_entropies - weighted_mean) ** 2 * weights_normalized).sum()
+            
+            # 归一化：熵的最大值是log(2)≈0.693
+            normalized_var = weighted_var / (0.693**2 + eps)
+            
+            num_students = len(unique_students)
+            scale_factor = torch.log(torch.tensor(num_students, dtype=torch.float, device=device) + 1)
+            
+            fairness_loss = alpha * normalized_var * scale_factor
+            return fairness_loss
+
+    elif method == 'performance_gap':
+        # 新方法4: 直接缩小最佳和最差学生性能差距
+        """
+        通过计算每个学生的性能代理指标，然后最小化最好和最差学生之间的差距
+        使用预测准确率作为AUC的代理指标
+        """
+        if true_labels is None or masks is None:
+            # 如果没有提供真实标签和掩码，回退到variance方法
+            return fairness_regularization(predictions, student_ids, alpha, 'variance', main_loss)
+        
+        student_performances = []
+        student_counts = []
+        
+        for student_id in unique_students:
+            student_mask = (student_ids == student_id).unsqueeze(1).expand_as(predictions)
+            
+            # 结合学生掩码和有效位置掩码
+            combined_mask = student_mask & masks
+            
+            if combined_mask.sum() > 0:
+                # 获取该学生的有效预测和真实标签
+                student_preds = predictions[combined_mask]
+                student_labels = true_labels[combined_mask]
+                
+                # 计算性能代理指标：预测准确率
+                pred_probs = torch.sigmoid(student_preds)
+                pred_binary = (pred_probs > 0.5).float()
+                accuracy = (pred_binary == student_labels).float().mean()
+                
+                # 或者使用更稳定的相关性指标
+                # 计算预测概率与真实标签的相关性（作为AUC的代理）
+                pred_centered = pred_probs - pred_probs.mean()
+                label_centered = student_labels - student_labels.mean()
+                
+                # 避免除零
+                pred_std = pred_centered.std() + eps
+                label_std = label_centered.std() + eps
+                
+                correlation = (pred_centered * label_centered).mean() / (pred_std * label_std)
+                
+                # 使用准确率和相关性的加权组合作为性能指标
+                performance = 0.7 * accuracy + 0.3 * (correlation + 1) / 2  # 将相关性映射到[0,1]
+                
+                student_performances.append(performance)
+                student_counts.append(combined_mask.sum().float())
+        
+        if len(student_performances) >= 2:
+            student_performances = torch.stack(student_performances)
+            student_counts = torch.stack(student_counts)
+            
+            # 计算加权性能（考虑样本数量）
+            weights = torch.sqrt(student_counts) / (torch.sqrt(student_counts).sum() + eps)
+            weighted_performances = student_performances * weights
+            
+            # 找到最好和最差的学生性能
+            max_performance = weighted_performances.max()
+            min_performance = weighted_performances.min()
+            
+            # 计算性能差距
+            performance_gap = max_performance - min_performance
+            
+            # 归一化处理：性能差距范围[0, 1]
+            # 添加平滑项避免过度惩罚小差距
+            smoothed_gap = performance_gap / (1.0 + eps)
+            
+            # 根据学生数量进行规模归一化
+            num_students = len(unique_students)
+            scale_factor = torch.log(torch.tensor(num_students, dtype=torch.float, device=device) + 1)
+            
+            # 最小化最大差距
+            fairness_loss = alpha * smoothed_gap * scale_factor
+            return fairness_loss
+    
+    return torch.tensor(0.0, device=device, requires_grad=True)
+
 class PredictionWriter:
     def __init__(self, csv_path: str, concept_col: str = 'concepts', response_col: str = 'responses'):
         """
@@ -402,6 +618,7 @@ def model_forward(model, data, writer: PredictionWriter,opt=None, rel=None,model
     # print(f"model forward{ii}")
     ii = ii+1
     model_name = model.model_name
+    # print(f"model_name: {model_name}")
     # if model_name in ["dkt_forget", "lpkt"]:
     #     q, c, r, qshft, cshft, rshft, m, sm, d, dshft = data
     if model_name in ["dkt_forget", "bakt_time"]:
@@ -415,7 +632,7 @@ def model_forward(model, data, writer: PredictionWriter,opt=None, rel=None,model
         q, c, r, t = dcur["qseqs"].to(device), dcur["cseqs"].to(device), dcur["rseqs"].to(device), dcur["tseqs"].to(device)
         qshft, cshft, rshft, tshft = dcur["shft_qseqs"].to(device), dcur["shft_cseqs"].to(device), dcur["shft_rseqs"].to(device), dcur["shft_tseqs"].to(device)
     m, sm = dcur["masks"].to(device), dcur["smasks"].to(device)
-
+    uids = dcur["uid"].to(device)
     ys, preloss = [], []
     cq = torch.cat((q[:,0:1], qshft), dim=1)
     cc = torch.cat((c[:,0:1], cshft), dim=1)
@@ -594,28 +811,38 @@ def model_forward(model, data, writer: PredictionWriter,opt=None, rel=None,model
         preloss.append(reg_loss)
     elif model_name in ["aktb"]:               
         y, reg_loss = model(cc.long(), cr.long(), cq.long())
-        ys.append(y[:,1:])
-        preloss.append(reg_loss)
-        # 添加公平性正则化项
-
+        y_pred = y[:,1:]  # 预测输出
+        ys.append(y_pred)
+        
         # 配置公平性正则化参数
         fairness_alpha = model.alpha
         fairness_method = model.method
         enable_fairness = model.enable
-        
+        # print(f"fairness_alpha: {fairness_alpha}")
+        # print(f"enable_fairness: {enable_fairness}")
+        # print(f"fairness_method: {fairness_method}")
         if enable_fairness:
+            
+            # 先计算主任务损失用于自适应归一化
+            y_masked = torch.masked_select(y_pred, sm)
+            t_masked = torch.masked_select(rshft, sm)
+            main_task_loss = F.binary_cross_entropy(y_masked.double(), t_masked.double())
+            
             # 计算公平性损失并直接加到reg_loss中
             fairness_loss = fairness_regularization(
-                y_pred, uids, alpha=fairness_alpha, method=fairness_method
+                y_pred, uids, alpha=fairness_alpha, method=fairness_method, main_loss=main_task_loss
             )
+            print(f"fairness_loss: {fairness_loss}")
             # 将公平性损失加到原有的正则化损失中
             total_reg_loss = reg_loss + fairness_loss
             
             # 可选：打印公平性损失用于监控
             if ii % 100 == 0:  # 每100个batch打印一次
-                print(f"Batch {ii}: Reg Loss = {reg_loss.item():.6f}, Fairness Loss = {fairness_loss.item():.6f}")
+                print(f"Batch {ii}: Main Loss = {main_task_loss.item():.6f}, "
+                      f"Reg Loss = {reg_loss.item():.6f}, Fairness Loss = {fairness_loss.item():.6f}")
         else:
             total_reg_loss = reg_loss
+            
         preloss.append(total_reg_loss)
     elif model_name in ["atakt"]: 
 
